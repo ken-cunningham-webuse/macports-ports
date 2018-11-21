@@ -22,6 +22,9 @@ subport ${name} {
     checksums           rmd160  8a0d07eb0cdd627a7cfea7c853248ee89e7607b3 \
                         sha256  59719d12a4970928aaca9f09f2ecc371ea967218df169d46155135a6f9894083 \
                         size    37130
+
+    github.setup        kencu macports-legacy-support HEAD
+    checksum {}
 }
 
 subport ${name}-devel {
