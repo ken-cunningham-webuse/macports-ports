@@ -1,0 +1,25 @@
+diff --git a/src/interface/power_management_osx.m.orig b/src/interface/power_management_osx.m
+index a289120..39585c4 100644
+--- src/interface/power_management_osx.m.orig
++++ src/interface/power_management_osx.m
+@@ -2,16 +2,20 @@
+ 
+void const* PowerManagmentImpl_SetBusy()
+{
++#if MAC_OS_X_VERSION_MAX_ALLOWED >= 1090
+	NSActivityOptions opt = NSActivityUserInitiated | NSActivityIdleSystemSleepDisabled;
+	id activity = [[NSProcessInfo processInfo] beginActivityWithOptions:opt reason:@"Preventing idle sleep during transfers and other operations."];
+	return CFBridgingRetain(activity);
++#endif
+}
+
+void PowerManagmentImpl_SetIdle(void* activity)
+{
+	if (activity) {
++#if MAC_OS_X_VERSION_MAX_ALLOWED >= 1090
+		id<NSObject> activityId = CFBridgingRelease(activity);
+		[[NSProcessInfo processInfo] endActivity:activityId];
++#endif
+	}
+}
+

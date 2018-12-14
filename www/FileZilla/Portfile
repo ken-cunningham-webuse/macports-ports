@@ -4,6 +4,7 @@ PortSystem          1.0
 PortGroup           wxWidgets 1.0
 PortGroup           compiler_blacklist_versions 1.0
 PortGroup           cxx11 1.1
+PortGroup           legacysupport 1.0
 
 name                FileZilla
 version             3.39.0
@@ -45,7 +46,9 @@ use_bzip2           yes
 worksrcdir          filezilla-${version}
 
 patchfiles          patch-src-interface-buildinfo.cpp.diff \
-                    patch-skip-dylibcopy.diff
+                    patch-skip-dylibcopy.diff \
+                    patch-filezilla-src-interface-powermgm.diff \
+                    patch-info-plist-106.diff
 
 # http://trac.filezilla-project.org/ticket/5473
 # http://sourceforge.net/p/tinyxml/patches/51/
