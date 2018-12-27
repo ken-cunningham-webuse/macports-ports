@@ -3,8 +3,8 @@ PortGroup               compiler_blacklist_versions 1.0
 
 name                    libcxx
 epoch                   1
-version                 5.0.1
-revision                2
+version                 7.0.1
+revision                0
 categories              lang
 platforms               darwin
 license                 MIT NCSA
@@ -30,12 +30,14 @@ set libcxx_distname     libcxx-${version}.src
 distfiles               ${libcxxabi_distname}${extract.suffix} \
                         ${libcxx_distname}${extract.suffix}
 
-checksums               libcxxabi-5.0.1.src.tar.xz \
-                        rmd160  93b74a0644c1afd565938fba5e21b200b206c72a \
-                        sha256  5a25152cb7f21e3c223ad36a1022faeb8a5ac27c9e75936a5ae2d3ac48f6e854 \
-                        libcxx-5.0.1.src.tar.xz \
-                        rmd160  1e5a22e62515382488f232039e31f0b12c08ca4f \
-                        sha256  fa8f99dd2bde109daa3276d529851a3bce5718d46ce1c5d0806f46caa3e57c00
+checksums               libcxxabi-7.0.1.src.tar.xz \
+                        rmd160  d790c5434055bb58404ba71eaa0c45e97591b8f2 \
+                        sha256  8168903a157ca7ab8423d3b974eaa497230b1564ceb57260be2bd14412e8ded8 \
+                        size    535096 \
+                        libcxx-7.0.1.src.tar.xz \
+                        rmd160  ddc3aad371b5cf018bf977ddb66efbc024fd4aea \
+                        sha256  020002618b319dc2a8ba1f2cba88b8cc6a209005ed8ad29f9de0c562c6ebb9f1 \
+                        size    1638188
 
 use_configure no
 

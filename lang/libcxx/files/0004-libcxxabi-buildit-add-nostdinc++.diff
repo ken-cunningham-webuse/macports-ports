@@ -1,7 +1,7 @@
-diff --git libcxxabi-5.0.1.src/lib/buildit.old libcxxabi-5.0.1.src/lib/buildit
+diff --git libcxxabi-7.0.1.src/lib/buildit.old libcxxabi-7.0.1.src/lib/buildit
 index d03e0e6..3690482 100755
---- libcxxabi-5.0.1.src/lib/buildit.old
-+++ libcxxabi-5.0.1.src/lib/buildit
+--- libcxxabi-7.0.1.src/lib/buildit.old
++++ libcxxabi-7.0.1.src/lib/buildit
 @@ -27,7 +27,7 @@ then
    RC_ProjectSourceVersion=1
  fi

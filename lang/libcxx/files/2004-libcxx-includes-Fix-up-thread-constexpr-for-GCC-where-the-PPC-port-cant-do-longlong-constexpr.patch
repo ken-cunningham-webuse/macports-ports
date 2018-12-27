@@ -4,13 +4,13 @@ Subject: [PATCH] Fix up thread constexpr for GCC where the PPC port can't do
  long long constexpr.
 
 ---
- libcxx-5.0.1.src/include/thread | 6 ++++++
+ libcxx-7.0.1.src/include/thread | 6 ++++++
  1 file changed, 6 insertions(+)
 
-diff --git libcxx-5.0.1.src/include/include/thread libcxx-5.0.1.src/include/thread
+diff --git libcxx-7.0.1.src/include/include/thread libcxx-7.0.1.src/include/thread
 index 022021c..7a4d692 100644
---- libcxx-5.0.1.src/include/thread
-+++ libcxx-5.0.1.src/include/thread
+--- libcxx-7.0.1.src/include/thread
++++ libcxx-7.0.1.src/include/thread
 @@ -443,7 +443,13 @@ sleep_for(const chrono::duration<_Rep, _Period>& __d)
      using namespace chrono;
      if (__d > duration<_Rep, _Period>::zero())

@@ -1,8 +1,8 @@
-diff --git libcxxabi-5.0.1.src/src/emutls.c libcxxabi-5.0.1.src/src/emutls.c
+diff --git libcxxabi-7.0.1.src/src/emutls.c libcxxabi-7.0.1.src/src/emutls.c
 new file mode 100644
 index 0000000..0907edc
 --- /dev/null
-+++ libcxxabi-5.0.1.src/src/emutls.c
++++ libcxxabi-7.0.1.src/src/emutls.c
 @@ -0,0 +1,394 @@
 +/* ===---------- emutls.c - Implements __emutls_get_address ---------------===
 + *
@@ -398,11 +398,11 @@ index 0000000..0907edc
 +        array->data[index] = emutls_allocate_object(control);
 +    return array->data[index];
 +}
-diff --git libcxxabi-5.0.1.src/include/int_lib.h libcxxabi-5.0.1.src/include/int_lib.h
+diff --git libcxxabi-7.0.1.src/include/int_lib.h libcxxabi-7.0.1.src/include/int_lib.h
 new file mode 100644
 index 0000000..9d09e2d
 --- /dev/null
-+++ libcxxabi-5.0.1.src/include/int_lib.h
++++ libcxxabi-7.0.1.src/include/int_lib.h
 @@ -0,0 +1,134 @@
 +/* ===-- int_lib.h - configuration header for compiler-rt  -----------------===
 + *
@@ -538,11 +538,11 @@ index 0000000..9d09e2d
 +#endif /* defined(_MSC_VER) && !defined(__clang__) */
 +
 +#endif /* INT_LIB_H */
-diff --git libcxxabi-5.0.1.src/include/int_util.h libcxxabi-5.0.1.src/include/int_util.h
+diff --git libcxxabi-7.0.1.src/include/int_util.h libcxxabi-7.0.1.src/include/int_util.h
 new file mode 100644
 index 0000000..a7b20ed
 --- /dev/null
-+++ libcxxabi-5.0.1.src/include/int_util.h
++++ libcxxabi-7.0.1.src/include/int_util.h
 @@ -0,0 +1,33 @@
 +/* ===-- int_util.h - internal utility functions ----------------------------===
 + *
@@ -577,11 +577,11 @@ index 0000000..a7b20ed
 +  typedef char ct_assert_##cnt[(expr) ? 1 : -1] UNUSED
 +
 +#endif /* INT_UTIL_H */
-diff --git libcxxabi-5.0.1.src/include/int_types.h libcxxabi-5.0.1.src/include/int_types.h
+diff --git libcxxabi-7.0.1.src/include/int_types.h libcxxabi-7.0.1.src/include/int_types.h
 new file mode 100644
 index 0000000..f53f343
 --- /dev/null
-+++ libcxxabi-5.0.1.src/include/int_types.h
++++ libcxxabi-7.0.1.src/include/int_types.h
 @@ -0,0 +1,164 @@
 +/* ===-- int_lib.h - configuration header for compiler-rt  -----------------===
 + *
@@ -747,11 +747,11 @@ index 0000000..f53f343
 +#endif
 +#endif /* INT_TYPES_H */
 +
-diff --git libcxxabi-5.0.1.src/include/int_endianness.h libcxxabi-5.0.1.src/include/int_endianness.h
+diff --git libcxxabi-7.0.1.src/include/int_endianness.h libcxxabi-7.0.1.src/include/int_endianness.h
 new file mode 100644
 index 0000000..e2586c5
 --- /dev/null
-+++ libcxxabi-5.0.1.src/include/int_endianness.h
++++ libcxxabi-7.0.1.src/include/int_endianness.h
 @@ -0,0 +1,116 @@
 +/* ===-- int_endianness.h - configuration header for compiler-rt ------------===
 + *
