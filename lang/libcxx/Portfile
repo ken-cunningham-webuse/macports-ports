@@ -69,10 +69,14 @@ platform darwin {
 }
 
 variant replacemnt_libcxx description {EXPERTS ONLY: Build a replacement libcxxabi and libcxx even if it is already part of the base OS.} {}
+variant build_with_gcc description {Build libcxx and libcxxabi with gcc.} {}
 
 if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
-    variant universal {}
-    default_variants +universal
+
+    if {![variant_isset build_with_gcc]} {
+      variant universal {}
+      default_variants +universal
+    }
 
     if {${os.major} < 11} {
         variant emulated_tls description {build libcxxabi and libcxx with support for emulated thread_local storage} {}
@@ -94,6 +98,11 @@ if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
     }
 
     supported_archs i386 x86_64 ppc
+
+    if {[variant_isset build_with_gcc]} {
+        compiler.blacklist
+        compiler.whitelist macports-gcc-7 macports-gcc-6
+    }
 
     if {[variant_isset universal] && [lsearch ${universal_archs} ppc] != -1} {
         # http://trac.macports.org/wiki/LibcxxOnOlderSystems#Leopardppc
@@ -136,6 +145,11 @@ if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
         0007-libcxxabi-include-expose-cxa-thread-atexit.patch
     }
 
+    if {[variant_isset build_with_gcc]} {
+      patchfiles-append \
+        0008-patch-libcxxabi-buildit-script-build-with-gcc.diff
+    }
+
     # restore libc++ buildit and patches for libc++ buildit
     patchfiles-append \
         1001-Revert-Remove-the-buildit-and-testit-scripts-they-ha.patch          \
@@ -143,6 +157,11 @@ if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
         1003-libcxx-buildit-Set-compatibility-version-to-RC_ProjectSourc.patch \
         1004-libcxx-MacPorts-Use-LIBCXXABI_PATH-for-path-to-build-time-l.patch \
         1005-libcxx-buildit-Fix-CFLAGS-for-Leopard-and-Snow-Leopard-to-i.patch
+
+    if {[variant_isset build_with_gcc]} {
+      patchfiles-append \
+        1006-patch-libcxx-buildit-script-build-with-gcc.diff
+    }
 
     # patches for libc++ include files
     patchfiles-append \
