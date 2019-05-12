@@ -38,6 +38,9 @@ checksums           rmd160  a51d7f812f45980c517c4505e04a217cf319a992 \
                     sha256  ea6ef08f121239da5695f76c9b33637a118dcf63e24164422231917fa61fb206 \
                     size    70607648
 
+# use alternate random source on < 10.7 as arc4random_buf not available there
+patchfiles          patch-gcc9-libsanitizer-arc4randombuf-missing-less-than-1070.diff
+
 depends_lib         port:cctools \
                     port:gmp \
                     path:lib/pkgconfig/isl.pc:isl \
@@ -174,6 +177,11 @@ if { ${os.major} < 11 } {
         ui_error "${name} ${version} is not supported on Darwin ${os.major}"
         return -code error "incompatible OS X version"
     }
+}
+
+if {${build_arch} eq "i386" || ${build_arch} eq "ppc"} {
+    configure.cc-append -mdynamic-no-pic
+    configure.cxx-append -mdynamic-no-pic
 }
 
 # gcc cannot build if libunwind-headers is active
