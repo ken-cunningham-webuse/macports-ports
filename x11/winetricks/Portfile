@@ -44,4 +44,8 @@ variant zenity description {Use zenity for GUI dialog boxes} {
     depends_run-append  port:zenity
 }
 
-default_variants +zenity
+# only default to zenity if we're getting our ports from the buildbot
+# as the dependency is overwhelmingly cumbersome
+if { ${prefix} eq "/opt/local" } {
+    default_variants +zenity
+}
