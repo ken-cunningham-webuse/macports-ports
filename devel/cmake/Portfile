@@ -150,6 +150,11 @@ platform darwin {
         configure.env-append CMAKE_OSX_SYSROOT=/
     }
 
+    # suppress a linker warning when building 32bit on Mojave that makes cmake barf
+    if {${os.arch} eq "i386" && ${os.major} == 18} {
+        configure.env-append "LDFLAGS=-Wl,-w"
+    }
+
     if {${os.arch} eq "i386" && ${os.major} <= 9} {
         # The old system headers do some bit shifting on Intel about which
         # newer compilers throw errors:
