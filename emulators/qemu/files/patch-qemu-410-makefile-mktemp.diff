@@ -1,0 +1,11 @@
+--- a/Makefile.orig	2019-10-12 13:52:53.000000000 -0700
++++ b/Makefile	2019-10-12 13:53:03.000000000 -0700
+@@ -879,7 +879,7 @@
+ endif
+ ifneq ($(DESCS),)
+ 	$(INSTALL_DIR) "$(DESTDIR)$(qemu_datadir)/firmware"
+-	set -e; tmpf=$$(mktemp); trap 'rm -f -- "$$tmpf"' EXIT; \
++	set -e; tmpf=$$(gmktemp); trap 'rm -f -- "$$tmpf"' EXIT; \
+ 	for x in $(DESCS); do \
+ 		sed -e 's,@DATADIR@,$(qemu_datadir),' \
+ 			"$(SRC_PATH)/pc-bios/descriptors/$$x" > "$$tmpf"; \

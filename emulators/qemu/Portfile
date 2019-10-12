@@ -1,7 +1,6 @@
 # -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
 
 PortSystem 1.0
-PortGroup compiler_blacklist_versions 1.0
 
 # https://trac.macports.org/ticket/58700
 PortGroup legacysupport 1.0
@@ -29,7 +28,9 @@ checksums               rmd160  8625c6175f58dc3b96c3bf90444af4ade6a5ff20 \
                         sha256  49f0de77410d4d0f7d0321ff2c2888b281381f06e1e2dac9ec4d061e3934f4ae \
                         size    66853497
 
-patchfiles              patch-configure.diff
+patchfiles-append       patch-configure.diff \
+                        patch-qemu-410-ui-cocoa.m-like-qemu-400-for-now.diff
+                        
 patch.pre_args          -p1
 
 depends_build           port:texinfo \
@@ -45,14 +46,7 @@ depends_lib             port:curl \
                         port:zlib \
                         path:lib/pkgconfig/pixman-1.pc:libpixman
 
-# see #39058
-compiler.blacklist      {clang < 500} *gcc-4.2 *gcc-4.0 gcc-3.3
-if {${os.platform} eq "darwin" && ${os.major} < 11} {
-    # Emulated TLS needed, which was added in LLVM 3.8
-    compiler.blacklist-append   macports-clang-3.4 macports-clang-3.3 macports-clang-3.7
-    compiler.fallback-append    macports-clang-8.0 macports-clang-7.0 macports-clang-6.0 macports-clang-5.0
-    configure.cflags-append     -femulated-tls
-}
+compiler.thread_local_storage yes
 
 # Select compiler
 configure.args          --cpu=${configure.build_arch} \
@@ -97,6 +91,16 @@ configure.args-append   --disable-cocoa \
                         --disable-xen \
                         --disable-snappy \
                         --disable-lzo
+
+
+# tried many ways to append this library onto the link line; this one finally worked
+# there may be another way to do it that also works; please feel free to improve
+configure.cc-append -Wl,-lMacportsLegacySupport
+configure.cxx-append -Wl,-lMacportsLegacySupport
+
+# the mktemp command is too old for this port, use gnu coreutils mktemp instead
+depends_build-append port:coreutils
+patchfiles-append patch-qemu-410-makefile-mktemp.diff
 
 # libtool: unknown option character `-' in: --mode=compile
 configure.env-append   LIBTOOL=${prefix}/bin/glibtool
