@@ -99,6 +99,13 @@ if {${name} eq ${subport}} {
                         --with-audit=bsm \
                         --with-keychain=apple
 
+    # older systems don't support the newer keychain security needed
+    # https://trac.macports.org/ticket/59397
+    if { ${os.major} < 11 } {
+        configure.args-delete --with-audit=bsm \
+                              --with-keychain=apple
+    }
+
     use_parallel_build  yes
 
     destroot.target     install-nokeys
