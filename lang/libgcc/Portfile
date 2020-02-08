@@ -30,8 +30,10 @@ variant universal   { }
 
 # Pick the gcc version that provides the primary runtime.
 # NOTE : The logic here must match that in the gccX ports.
-if { ${os.major} < 10 } {
+if { ${os.major} == 8 } {
     set gcc_version 7
+} elseif { ${os.major} == 9 } {
+    set gcc_version 8
 } else {
     set gcc_version 9
 }

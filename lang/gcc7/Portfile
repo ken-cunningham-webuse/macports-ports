@@ -11,7 +11,7 @@ name                gcc7
 epoch               3
 version             7.5.0
 revision            1
-subport             libgcc7 { revision 0 }
+subport             libgcc7 { revision 1 }
 platforms           darwin
 categories          lang
 maintainers         nomaintainer
@@ -41,7 +41,7 @@ checksums           rmd160  91d46ec088badec75f41a2ad2a0ba228a6715107 \
 # If it is, libgcc7 installs a full runtime, otherwise it only installs
 # what is missing from newer libgccX builds.
 # NOTE : The logic here must match that in the libgcc port.
-set isLastSupported [ expr ${os.major} < 10 ]
+set isLastSupported [ expr ${os.major} == 8 ]
 
 depends_lib         port:cctools \
                     port:gmp \
