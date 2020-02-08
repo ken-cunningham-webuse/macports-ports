@@ -160,7 +160,7 @@ destroot.target     install install-info-host
 
 # Is this gcc release supported here.
 # NOTE : The logic here must match that in the libgcc port.
-if { ${os.major} < 10 } {
+if { ${os.major} < 9 } {
     known_fail  yes
     pre-fetch {
         ui_error "${name} ${version} is not supported on Darwin ${os.major}"
