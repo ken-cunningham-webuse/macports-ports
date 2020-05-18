@@ -3,8 +3,8 @@
 PortSystem      1.0
 
 name            libetonyek
-version         0.1.2
-revision        2
+version         0.1.9
+revision        0
 maintainers     {gmail.com:rjvbertin @RJVB}
 categories      textproc
 platforms       darwin
@@ -18,8 +18,9 @@ master_sites    http://dev-www.libreoffice.org/src/${name}
 
 use_xz          yes
 
-checksums       rmd160  2ef12ef4fbf6924a9e51f991dee47b5156742114 \
-                sha256  58d078a76c3fd839c282244a1a7dabca81cef64be086a5c7d8470bb64208da39
+checksums       rmd160  05769e91a32fca98060a753ec265e54e9dcf0b6d \
+                sha256  e61677e8799ce6e55b25afc11aa5339113f6a49cff031f336e32fa58635b1a4a \
+                size    1477064
 
 depends_build   port:pkgconfig\
                 port:gperf
