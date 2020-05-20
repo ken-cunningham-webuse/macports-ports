@@ -1,0 +1,793 @@
+diff --git libcxx-5.0.1.src/include/__atomic_locked libcxx-5.0.1.src/include/__atomic_locked
+new file mode 100644
+index 0000000..f10dd74
+--- /dev/null
++++ libcxx-5.0.1.src/include/__atomic_locked
+@@ -0,0 +1,240 @@
++// -*- C++ -*-
++//===--------------------------- __atomic_locked --------------------------===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++
++#ifndef _LIBCPP_ATOMIC_LOCKED
++#define _LIBCPP_ATOMIC_LOCKED
++
++#include <__mutex_base>	// for mutex and lock_guard
++
++/**
++	This provides slow-but-usable lock-based atomic access to
++	structures for which atomic lock-free functions are missing.
++	This is motivated by the desire for 64b atomic operations
++	on 32b PowerPC architectures.  
++**/
++
++#if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
++#pragma GCC system_header
++#endif
++
++_LIBCPP_BEGIN_NAMESPACE_STD
++
++template <class _Tp, bool = is_integral<_Tp>::value && !is_same<_Tp, bool>::value>
++struct __atomic_mutex_locked  // false
++{
++    mutable _Atomic(_Tp) __a_;
++    mutable mutex __lock_;
++    typedef lock_guard<mutex>	lock_type;
++
++    _Tp& na(void) const { return reinterpret_cast<_Tp&>(__a_); }
++    volatile _Tp& na(void) const volatile { return reinterpret_cast<volatile _Tp&>(__a_); }
++
++    _LIBCPP_INLINE_VISIBILITY
++    bool is_lock_free() const volatile _NOEXCEPT
++        {return false;}
++    _LIBCPP_INLINE_VISIBILITY
++    bool is_lock_free() const _NOEXCEPT
++        {return false;}
++    _LIBCPP_INLINE_VISIBILITY
++    void store(_Tp __d, memory_order = memory_order_seq_cst) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_)); na() = __d; }
++    _LIBCPP_INLINE_VISIBILITY
++    void store(_Tp __d, memory_order = memory_order_seq_cst) _NOEXCEPT
++        { const lock_type g(__lock_); na() = __d; }
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp load(memory_order = memory_order_seq_cst) const volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_)); return na(); }
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp load(memory_order = memory_order_seq_cst) const _NOEXCEPT
++        { const lock_type g(__lock_); return na(); }
++    _LIBCPP_INLINE_VISIBILITY
++    operator _Tp() const volatile _NOEXCEPT {return load();}
++    _LIBCPP_INLINE_VISIBILITY
++    operator _Tp() const _NOEXCEPT          {return load();}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp exchange(_Tp __d, memory_order = memory_order_seq_cst) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_));
++	// or use std::swap
++          const _Tp ret = na(); na() = __d; return ret; }
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp exchange(_Tp __d, memory_order = memory_order_seq_cst) _NOEXCEPT
++        { const lock_type g(__lock_);
++	// or use std::swap
++          const _Tp ret = na(); na() = __d; return ret; }
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_weak(_Tp& __e, _Tp __d,
++                               memory_order __s, memory_order __f) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_));
++	  if (na() == __e) { na() = __d; return true; }
++	  else { __e = na(); return false; }
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_weak(_Tp& __e, _Tp __d,
++                               memory_order __s, memory_order __f) _NOEXCEPT
++        { const lock_type g(__lock_);
++	  if (na() == __e) { na() = __d; return true; }
++	  else { __e = na(); return false; }
++	}
++
++    // for now, _weak inditinguishable from _strong
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_strong(_Tp& __e, _Tp __d,
++                                 memory_order __s, memory_order __f) volatile _NOEXCEPT
++        {return compare_exchange_weak(__e, __d, __s, __f);}
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_strong(_Tp& __e, _Tp __d,
++                                 memory_order __s, memory_order __f) _NOEXCEPT
++        {return compare_exchange_weak(__e, __d, __s, __f);}
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_weak(_Tp& __e, _Tp __d,
++                              memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT
++        {return compare_exchange_weak(__e, __d, __m, __m);}
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_weak(_Tp& __e, _Tp __d,
++                               memory_order __m = memory_order_seq_cst) _NOEXCEPT
++        {return compare_exchange_weak(__e, __d, __m, __m);}
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_strong(_Tp& __e, _Tp __d,
++                              memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT
++        {return compare_exchange_strong(__e, __d, __m, __m);}
++    _LIBCPP_INLINE_VISIBILITY
++    bool compare_exchange_strong(_Tp& __e, _Tp __d,
++                                 memory_order __m = memory_order_seq_cst) _NOEXCEPT
++        {return compare_exchange_strong(__e, __d, __m, __m);}
++
++    _LIBCPP_INLINE_VISIBILITY
++#ifndef _LIBCPP_HAS_NO_DEFAULTED_FUNCTIONS
++    __atomic_mutex_locked() _NOEXCEPT = default;
++#else
++    __atomic_mutex_locked() _NOEXCEPT : __a_() {}
++#endif // _LIBCPP_HAS_NO_DEFAULTED_FUNCTIONS
++
++    _LIBCPP_INLINE_VISIBILITY
++    _LIBCPP_CONSTEXPR __atomic_mutex_locked(_Tp __d) _NOEXCEPT : __a_(__d) {}
++#ifndef _LIBCPP_HAS_NO_DELETED_FUNCTIONS
++    __atomic_mutex_locked(const __atomic_mutex_locked&) = delete;
++    __atomic_mutex_locked& operator=(const __atomic_mutex_locked&) = delete;
++    __atomic_mutex_locked& operator=(const __atomic_mutex_locked&) volatile = delete;
++#else  // _LIBCPP_HAS_NO_DELETED_FUNCTIONS
++private:
++    __atomic_mutex_locked(const __atomic_mutex_locked&);
++    __atomic_mutex_locked& operator=(const __atomic_mutex_locked&);
++    __atomic_mutex_locked& operator=(const __atomic_mutex_locked&) volatile;
++#endif  // _LIBCPP_HAS_NO_DELETED_FUNCTIONS
++};	// end struct __atomic_mutex_locked
++
++// atomic<Integral>
++
++template <class _Tp>
++struct __atomic_mutex_locked<_Tp, true>
++    : public __atomic_mutex_locked<_Tp, false>
++{
++    typedef __atomic_mutex_locked<_Tp, false> __base;
++    typedef	typename __base::lock_type	lock_type;
++    using __base::__lock_;
++    using __base::na;
++
++    _LIBCPP_INLINE_VISIBILITY
++    __atomic_mutex_locked() _NOEXCEPT _LIBCPP_DEFAULT
++    _LIBCPP_INLINE_VISIBILITY
++    _LIBCPP_CONSTEXPR __atomic_mutex_locked(_Tp __d) _NOEXCEPT : __base(__d) {}
++
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_add(_Tp __op, memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_));
++	  const _Tp ret = na(); na() += __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_add(_Tp __op, memory_order __m = memory_order_seq_cst) _NOEXCEPT
++        { const lock_type g(__lock_);
++	  const _Tp ret = na(); na() += __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_sub(_Tp __op, memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_));
++	  const _Tp ret = na(); na() -= __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_sub(_Tp __op, memory_order __m = memory_order_seq_cst) _NOEXCEPT
++        { const lock_type g(__lock_);
++	  const _Tp ret = na(); na() -= __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_and(_Tp __op, memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_));
++	  const _Tp ret = na(); na() &= __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_and(_Tp __op, memory_order __m = memory_order_seq_cst) _NOEXCEPT
++        { const lock_type g(__lock_);
++	  const _Tp ret = na(); na() &= __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_or(_Tp __op, memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_));
++	  const _Tp ret = na(); na() |= __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_or(_Tp __op, memory_order __m = memory_order_seq_cst) _NOEXCEPT
++        { const lock_type g(__lock_);
++	  const _Tp ret = na(); na() |= __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_xor(_Tp __op, memory_order __m = memory_order_seq_cst) volatile _NOEXCEPT
++        { const lock_type g(const_cast<mutex&>(__lock_));
++	  const _Tp ret = na(); na() ^= __op; return ret;
++	}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp fetch_xor(_Tp __op, memory_order __m = memory_order_seq_cst) _NOEXCEPT
++        { const lock_type g(__lock_);
++	  const _Tp ret = na(); na() ^= __op; return ret;
++	}
++
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator++(int) volatile _NOEXCEPT      {return fetch_add(_Tp(1));}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator++(int) _NOEXCEPT               {return fetch_add(_Tp(1));}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator--(int) volatile _NOEXCEPT      {return fetch_sub(_Tp(1));}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator--(int) _NOEXCEPT               {return fetch_sub(_Tp(1));}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator++() volatile _NOEXCEPT         {return fetch_add(_Tp(1)) + _Tp(1);}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator++() _NOEXCEPT                  {return fetch_add(_Tp(1)) + _Tp(1);}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator--() volatile _NOEXCEPT         {return fetch_sub(_Tp(1)) - _Tp(1);}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator--() _NOEXCEPT                  {return fetch_sub(_Tp(1)) - _Tp(1);}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator+=(_Tp __op) volatile _NOEXCEPT {return fetch_add(__op) + __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator+=(_Tp __op) _NOEXCEPT          {return fetch_add(__op) + __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator-=(_Tp __op) volatile _NOEXCEPT {return fetch_sub(__op) - __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator-=(_Tp __op) _NOEXCEPT          {return fetch_sub(__op) - __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator&=(_Tp __op) volatile _NOEXCEPT {return fetch_and(__op) & __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator&=(_Tp __op) _NOEXCEPT          {return fetch_and(__op) & __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator|=(_Tp __op) volatile _NOEXCEPT {return fetch_or(__op) | __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator|=(_Tp __op) _NOEXCEPT          {return fetch_or(__op) | __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator^=(_Tp __op) volatile _NOEXCEPT {return fetch_xor(__op) ^ __op;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator^=(_Tp __op) _NOEXCEPT          {return fetch_xor(__op) ^ __op;}
++};
++
++_LIBCPP_END_NAMESPACE_STD
++
++#endif  // _LIBCPP_ATOMIC_LOCKED
+diff --git libcxx-5.0.1.src/include/atomic libcxx-5.0.1.src/include/atomic
+index f55e28f..9ccf1ca 100644
+--- libcxx-5.0.1.src/include/atomic
++++ libcxx-5.0.1.src/include/atomic
+@@ -1885,4 +1885,50 @@ typedef atomic<uintmax_t> atomic_uintmax_t;
+ 
+ _LIBCPP_END_NAMESPACE_STD
+ 
++#if	defined(__ppc__) && !defined(__ppc64__)
++// specialize fallback implementation where 64b atomics are missing
++#include <__atomic_locked>
++
++_LIBCPP_BEGIN_NAMESPACE_STD
++
++template <>
++struct atomic<long long> : public __atomic_mutex_locked<long long>
++{
++    typedef long long		_Tp;
++    typedef __atomic_mutex_locked<_Tp> __base;
++    _LIBCPP_INLINE_VISIBILITY
++    atomic() _NOEXCEPT _LIBCPP_DEFAULT
++    _LIBCPP_INLINE_VISIBILITY
++    _LIBCPP_CONSTEXPR atomic(_Tp __d) _NOEXCEPT : __base(__d) {}
++
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator=(_Tp __d) volatile _NOEXCEPT
++        {__base::store(__d); return __d;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator=(_Tp __d) _NOEXCEPT
++        {__base::store(__d); return __d;}
++};
++
++template <>
++struct atomic<unsigned long long> :
++	public __atomic_mutex_locked<unsigned long long>
++{
++    typedef unsigned long long		_Tp;
++    typedef __atomic_mutex_locked<_Tp> __base;
++    _LIBCPP_INLINE_VISIBILITY
++    atomic() _NOEXCEPT _LIBCPP_DEFAULT
++    _LIBCPP_INLINE_VISIBILITY
++    _LIBCPP_CONSTEXPR atomic(_Tp __d) _NOEXCEPT : __base(__d) {}
++
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator=(_Tp __d) volatile _NOEXCEPT
++        {__base::store(__d); return __d;}
++    _LIBCPP_INLINE_VISIBILITY
++    _Tp operator=(_Tp __d) _NOEXCEPT
++        {__base::store(__d); return __d;}
++};
++
++_LIBCPP_END_NAMESPACE_STD
++#endif	// defined(__ppc__) && !defined(__ppc64__)
++
+ #endif  // _LIBCPP_ATOMIC
+diff --git libcxx-5.0.1.src/include/iterator libcxx-5.0.1.src/include/iterator
+index d163ab1..a448907 100644
+--- libcxx-5.0.1.src/include/iterator
++++ libcxx-5.0.1.src/include/iterator
+@@ -1044,8 +1044,8 @@ public:
+     _LIBCPP_INLINE_VISIBILITY bool failed() const _NOEXCEPT {return __sbuf_ == 0;}
+ 
+ #if !defined(__APPLE__) || \
+-    (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED > __MAC_10_8) || \
+-    (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED > __IPHONE_6_0)
++    (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && defined(__MAC_10_8) && __MAC_OS_X_VERSION_MIN_REQUIRED > __MAC_10_8) || \
++    (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && defined(__IPHONE_6_0) && __IPHONE_OS_VERSION_MIN_REQUIRED > __IPHONE_6_0)
+ 
+     template <class _Ch, class _Tr>
+     friend
+diff --git libcxx-5.0.1.src/include/locale libcxx-5.0.1.src/include/locale
+index d30d950..cd28695 100644
+--- libcxx-5.0.1.src/include/locale
++++ libcxx-5.0.1.src/include/locale
+@@ -1372,8 +1372,8 @@ __pad_and_output(_OutputIterator __s,
+ }
+ 
+ #if !defined(__APPLE__) || \
+-    (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED > __MAC_10_8) || \
+-    (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED > __IPHONE_6_0)
++    (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && defined(__MAC_10_8) && __MAC_OS_X_VERSION_MIN_REQUIRED > __MAC_10_8) || \
++    (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && defined(__IPHONE_6_0) && __IPHONE_OS_VERSION_MIN_REQUIRED > __IPHONE_6_0)
+ 
+ template <class _CharT, class _Traits>
+ _LIBCPP_HIDDEN
+diff --git libcxx-5.0.1.src/include/math.h libcxx-5.0.1.src/include/math.h
+index 8c30ba8..023943c 100644
+--- libcxx-5.0.1.src/include/math.h
++++ libcxx-5.0.1.src/include/math.h
+@@ -300,6 +300,32 @@ long double    truncl(long double x);
+ 
+ #include_next <math.h>
+ 
++#ifdef __APPLE__
++# if __has_include(<Availability.h>)
++#  include <Availability.h>
++#  if __MAC_OS_X_VERSION_MAX_ALLOWED < 1070
++#    define __APPLE_BAD_MATH_H 1
++#  else
++#    define __APPLE_BAD_MATH_H 0
++#  endif
++# else
++#  define __APPLE_BAD_MATH_H 1
++# endif
++
++# if __APPLE_BAD_MATH_H
++/* These prototypes are incorrectly omitted from <math.h> on Snow Leopard despite being available */
++extern "C" {
++    extern long long int llrintl(long double);
++    extern long long int llrint(double);
++    extern long long int llrintf(float);
++
++    extern long long int llroundl(long double);
++    extern long long int llround(double);
++    extern long long int llroundf(float);
++}
++# endif
++#endif // __APPLE__
++
+ #ifdef __cplusplus
+ 
+ // We support including .h headers inside 'extern "C"' contexts, so switch
+diff --git libcxx-5.0.1.src/include/thread libcxx-5.0.1.src/include/thread
+index 1b8dca3..5af7d9b 100644
+--- libcxx-5.0.1.src/include/thread
++++ libcxx-5.0.1.src/include/thread
+@@ -435,7 +435,13 @@ sleep_for(const chrono::duration<_Rep, _Period>& __d)
+     using namespace chrono;
+     if (__d > duration<_Rep, _Period>::zero())
+     {
++#if ! defined (__clang__) && __APPLE__ && (__ppc__ || __ppc64__)
++        // We can't test for __GNUC__ since clang also defines that.
++        _LIBCPP_CONSTEXPR duration<long double> _Max = duration<long double>(ULLONG_MAX/1000000000ULL) ;
++         //nanoseconds::max(); .. long double const folding is broken :(
++#else
+         _LIBCPP_CONSTEXPR duration<long double> _Max = nanoseconds::max();
++#endif
+         nanoseconds __ns;
+         if (__d < _Max)
+         {
+diff --git libcxx-5.0.1.src/lib/buildit libcxx-5.0.1.src/lib/buildit
+new file mode 100755
+index 0000000..e1ef338
+--- /dev/null
++++ libcxx-5.0.1.src/lib/buildit
+@@ -0,0 +1,176 @@
++#! /bin/sh
++#
++# Set the $TRIPLE environment variable to your system's triple before
++# running this script.  If you set $CXX, that will be used to compile
++# the library.  Otherwise we'll use clang++.
++
++set -e
++
++echo "---------- WARNING ----------"
++echo "buildit is no longer supported and will be removed in the next week!"
++echo "please contact the libc++ maintainers if you have any concerns"
++echo ""
++
++if [ `basename $(pwd)` != "lib" ]
++then
++    echo "current directory must be lib"
++    exit 1
++fi
++
++if [ -z "$CXX" ]
++then
++    CXX=clang++
++fi
++
++if [ -z "$CXX_LANG" ]
++then
++    CXX_LANG=c++11
++fi
++
++if [ -z "$CC" ]
++then
++    CC=clang
++fi
++
++if [ -z "$MACOSX_DEPLOYMENT_TARGET" ]
++then
++    if [ -z "$IPHONEOS_DEPLOYMENT_TARGET" ]
++    then
++        MACOSX_DEPLOYMENT_TARGET=10.7
++    fi
++fi
++
++if [ -z "$RC_ProjectSourceVersion" ]
++then
++  RC_ProjectSourceVersion=1
++fi
++
++EXTRA_FLAGS="-nostdinc++ -std=${CXX_LANG} -fstrict-aliasing -Wall -Wextra -Wshadow -Wconversion \
++             -Wstrict-aliasing=2 -Wstrict-overflow=4 -D_LIBCPP_BUILDING_LIBRARY "
++
++case $TRIPLE in
++  *-apple-*)
++    if [ -z $RC_XBS ]
++    then
++      RC_CFLAGS="-arch i386 -arch x86_64"
++    fi
++    SOEXT=dylib
++
++    if [ -z "${LIBCXXABI_DYLIB_PATH}" ]
++    then
++        LIBCXXABI_DYLIB_PATH=/usr/lib/libc++abi.dylib
++    fi
++
++    if [[ "$MACOSX_DEPLOYMENT_TARGET" == 10.[456] ]]
++    then
++        EXTRA_FLAGS="${EXTRA_FLAGS} -U__STRICT_ANSI__"
++        LDSHARED_FLAGS="-o libc++.1.dylib \
++            -dynamiclib -nodefaultlibs \
++            -current_version ${RC_ProjectSourceVersion} \
++            -compatibility_version 1 \
++            -install_name /usr/lib/libc++.1.dylib \
++            -Wl,-reexport_library,${LIBCXXABI_DYLIB_PATH} \
++            -Wl,-unexported_symbols_list,libc++unexp.exp  \
++            /usr/lib/libSystem.B.dylib /usr/lib/libgcc_s.1.dylib"
++    else
++        LDSHARED_FLAGS="-o libc++.1.dylib \
++            -dynamiclib -nodefaultlibs  \
++            -current_version ${RC_ProjectSourceVersion} \
++            -compatibility_version 1 \
++            -install_name /usr/lib/libc++.1.dylib \
++            -lSystem  \
++            -Wl,-unexported_symbols_list,libc++unexp.exp  \
++            -Wl,-reexport_library,${LIBCXXABI_DYLIB_PATH} \
++            -Wl,-reexported_symbols_list,libc++abi2.exp \
++            -Wl,-force_symbols_not_weak_list,notweak.exp \
++            -Wl,-force_symbols_weak_list,weak.exp"
++    fi
++    ;;
++  *-*-mingw*)
++    # FIXME: removing libgcc and libsupc++ dependencies means porting libcxxrt and LLVM/compiler-rt
++    SOEXT=dll
++    LDSHARED_FLAGS="-o libc++.dll \
++        -shared -nodefaultlibs -Wl,--export-all-symbols -Wl,--allow-multiple-definition -Wl,--out-implib,libc++.dll.a \
++        -lsupc++ -lpthread -lmingw32 -lgcc_s -lgcc -lmoldname -lmingwex -lmsvcr100 -ladvapi32 -lshell32 -luser32 -lkernel32 -lmingw32 -lgcc_s -lgcc -lmoldname -lmingwex -lmsvcrt"
++    ;;
++  *-ibm-*)
++    hostOS=`uname`
++    hostOS=`echo $hostOS | sed -e "s/\s+$//"`
++    hostOS=`echo $hostOS | tr '[A-Z]' '[a-z]'`
++
++    if [ $hostOS = "linux" ]
++    then
++      LDSHARED_FLAGS="-o libc++.so.1 \
++        -qmkshrobj -Wl,-soname,libc++.so.1 \
++        -lpthread -lrt -lc -lstdc++"
++      EXTRA_FLAGS="-qlanglvl=extended0x -D__GLIBCXX__=1"
++    else
++      LDSHARED_FLAGS="-o shr.o -qmkshrobj -lpthread -bnoquiet"
++      EXTRA_FLAGS="-qlanglvl=extended0x"
++    fi
++    RC_CFLAGS="-qpic=large"
++    ;;
++  *)
++    RC_CFLAGS="-fPIC"
++    SOEXT=so
++    LDSHARED_FLAGS="-o libc++.so.1.0 \
++        -shared -nodefaultlibs -Wl,-soname,libc++.so.1 \
++        -lpthread -lrt -lc -lstdc++"
++    ;;
++esac
++
++if [ -z "$RC_XBS" ]
++then
++    rm -f libc++.1.$SOEXT*
++fi
++
++set -x
++
++for FILE in ../src/*.cpp; do
++    $CXX -c -g -Os $RC_CFLAGS $EXTRA_FLAGS -I../include $FILE
++done
++case $TRIPLE in
++  *-*-mingw*)
++  for FILE in ../src/support/win32/*.cpp; do
++    $CXX -c -g -Os $RC_CFLAGS $EXTRA_FLAGS -I../include $FILE
++  done
++  ;;
++esac
++$CC *.o $RC_CFLAGS $LDSHARED_FLAGS $EXTRA_FLAGS
++
++#libtool -static -o libc++.a *.o
++
++# Create the link for the final library name, so that we can use this directory
++# as a link target for the tests.
++case $TRIPLE in
++    *-apple-*)
++        rm -f libc++.dylib
++        ln -s libc++.1.dylib libc++.dylib
++        ;;
++    *-*-mingw*)
++        ;;
++    *-ibm-*)
++        if [ $hostOS = "linux" ]
++        then
++           rm -f libc++.so
++           ln -s libc++.so.1 libc++.so
++        else #AIX
++           rm -f libc++.a
++           ar r libc++.a shr.o
++        fi
++        ;;
++    *)
++        rm -f libc++.so
++        ln -s libc++.so.1 libc++.so
++        ;;
++esac
++
++if [ -z "$RC_XBS" ]
++then
++    rm *.o
++fi
++
++echo "---------- WARNING ----------"
++echo "buildit is no longer supported and will be removed in the next week!"
++echo "please contact the libc++ maintainers if you have any concerns"
++echo ""
+diff --git libcxx-5.0.1.src/test/testit libcxx-5.0.1.src/test/testit
+new file mode 100644
+index 0000000..2fda687
+--- /dev/null
++++ libcxx-5.0.1.src/test/testit
+@@ -0,0 +1,183 @@
++#!/bin/sh
++# //===--------------------------- testit ---------------------------------===//
++# //
++# //                     The LLVM Compiler Infrastructure
++# //
++# // This file is distributed under the University of Illinois Open Source
++# // License. See LICENSE.TXT for details.
++# //
++# //===--------------------------------------------------------------------===//
++
++currentpath=`pwd`
++origpath=$currentpath
++currentdir=`basename $currentpath`
++while [ $currentdir != "test" ]; do
++	if [ $currentdir = "/" ]
++	then
++		echo "current directory must be in or under \"test\"."
++		exit 1
++	fi
++	cd ..
++	currentpath=`pwd`
++	currentdir=`basename $currentpath`
++done
++
++cd ..
++LIBCXX_ROOT=`pwd`
++cd $origpath
++
++if [ -z "$CC" ]
++then
++	if which xcrun >/dev/null
++	then
++		CC="xcrun clang++"
++	else
++		CC=clang++
++	fi
++fi
++
++if [ -z "$CXX_LANG" ]
++then
++    CXX_LANG=c++11
++fi
++if [ -z "$OPTIONS" ]
++then
++	OPTIONS="-std=${CXX_LANG} -stdlib=libc++ -nostdinc++"
++fi
++OPTIONS="$OPTIONS -I$LIBCXX_ROOT/test/support"
++
++if [ -z "$HEADER_INCLUDE" ]
++then
++       HEADER_INCLUDE="-I$LIBCXX_ROOT/include"
++fi
++
++if [ -z "$SOURCE_LIB" ]
++then
++       SOURCE_LIB="-L$LIBCXX_ROOT/lib"
++fi
++
++case $TRIPLE in
++  *-*-mingw* | *-*-cygwin* | *-*-win*)
++	TEST_EXE=test.exe
++    ;;
++  *)
++    TEST_EXE=a.out
++    ;;
++esac
++
++case $(uname -s) in
++   NetBSD)
++     THREAD_FLAGS=-lpthread
++     ;;
++esac
++
++FAIL=0
++PASS=0
++UNIMPLEMENTED=0
++IMPLEMENTED_FAIL=0
++IMPLEMENTED_PASS=0
++
++afunc() {
++	fail=0
++	pass=0
++	if (ls ${TEST_PREFIX}*fail.cpp > /dev/null 2>&1)
++	then
++		for FILE in $(ls ${TEST_PREFIX}*fail.cpp); do
++			if $CC $OPTIONS $HEADER_INCLUDE $SOURCE_LIB $FILE $LIBS -o ./$TEST_EXE > /dev/null 2>&1
++			then
++				rm ./$TEST_EXE
++				echo "$FILE should not compile"
++				fail=$(($fail+1))
++			else
++				pass=$(($pass+1))
++			fi
++		done
++	fi
++
++	if (ls ${TEST_PREFIX}*pass.cpp > /dev/null 2>&1)
++	then
++		for FILE in $(ls ${TEST_PREFIX}*pass.cpp); do
++            if [ "$VERBOSE" ]
++            then
++             	echo "Running test: " $FILE
++            fi
++			if $CC $OPTIONS $HEADER_INCLUDE $SOURCE_LIB $FILE $LIBS $(test $1 = no || echo $THREAD_FLAGS) -o ./$TEST_EXE
++			then
++				if ./$TEST_EXE
++				then
++					rm ./$TEST_EXE
++					pass=$(($pass+1))
++				else
++					echo "`pwd`/$FILE failed at run time"
++					echo "Compile line was:" $CC $OPTIONS $HEADER_INCLUDE $SOURCE_LIB $FILE $LIBS $(test $1 = no || echo $THREAD_FLAGS)
++					fail=$(($fail+1))
++					rm ./$TEST_EXE
++				fi
++			else
++				echo "`pwd`/$FILE failed to compile"
++				echo "Compile line was:" $CC $OPTIONS $HEADER_INCLUDE $SOURCE_LIB $FILE $LIBS $(test $1 = no || echo $THREAD_FLAGS)
++				fail=$(($fail+1))
++			fi
++		done
++	fi
++
++	if [ $fail -gt 0 ]
++	then
++		echo "failed $fail tests in `pwd`"
++		IMPLEMENTED_FAIL=$(($IMPLEMENTED_FAIL+1))
++	fi
++	if [ $pass -gt 0 ]
++	then
++		echo "passed $pass tests in `pwd`"
++		if [ $fail -eq 0 ]
++		then
++			IMPLEMENTED_PASS=$((IMPLEMENTED_PASS+1))
++		fi
++	fi
++	if [ $fail -eq 0 -a $pass -eq 0 ]
++	then
++		echo "not implemented:  `pwd`"
++		UNIMPLEMENTED=$(($UNIMPLEMENTED+1))
++	fi
++
++	FAIL=$(($FAIL+$fail))
++	PASS=$(($PASS+$pass))
++
++	for FILE in *
++	do
++		if [ -d "$FILE" ];
++		then
++			cd $FILE
++			if [ $FILE = thread -o $1 = yes ]; then
++				afunc yes
++			else
++				afunc no
++			fi
++			cd ..
++		fi
++	done
++}
++
++afunc no
++
++echo "****************************************************"
++echo "Results for `pwd`:"
++echo "using `$CC --version`"
++echo "with $OPTIONS $HEADER_INCLUDE $SOURCE_LIB"
++echo "----------------------------------------------------"
++echo "sections without tests   : $UNIMPLEMENTED"
++echo "sections with failures   : $IMPLEMENTED_FAIL"
++echo "sections without failures: $IMPLEMENTED_PASS"
++echo "                       +   ----"
++echo "total number of sections : $(($UNIMPLEMENTED+$IMPLEMENTED_FAIL+$IMPLEMENTED_PASS))"
++echo "----------------------------------------------------"
++echo "number of tests failed   : $FAIL"
++echo "number of tests passed   : $PASS"
++echo "                       +   ----"
++echo "total number of tests    : $(($FAIL+$PASS))"
++echo "****************************************************"
++
++echo "---------- WARNING ----------"
++echo "testit is no longer supported and will be removed in the future"
++
++exit $FAIL
+diff --git libcxxabi-5.0.1.src/lib/buildit libcxxabi-5.0.1.src/lib/buildit
+index 5a4a710..3690482 100755
+--- libcxxabi-5.0.1.src/lib/buildit
++++ libcxxabi-5.0.1.src/lib/buildit
+@@ -27,12 +27,12 @@ then
+   RC_ProjectSourceVersion=1
+ fi
+ 
+-EXTRA_FLAGS="-std=c++11 -stdlib=libc++ -fstrict-aliasing -Wstrict-aliasing=2 \
++EXTRA_FLAGS="-std=c++11 -stdlib=libc++ -nostdinc++ -fstrict-aliasing -Wstrict-aliasing=2 \
+              -Wsign-conversion -Wshadow -Wconversion -Wunused-variable \
+              -Wmissing-field-initializers -Wchar-subscripts -Wmismatched-tags \
+              -Wmissing-braces -Wshorten-64-to-32 -Wsign-compare \
+              -Wstrict-aliasing=2 -Wstrict-overflow=4 -Wunused-parameter \
+-             -Wnewline-eof"
++             -Wnewline-eof -D_LIBCPP_BUILDING_LIBRARY"
+ 
+ case $TRIPLE in
+   *-apple-*)
+@@ -52,6 +52,7 @@ case $TRIPLE in
+         -current_version ${RC_ProjectSourceVersion} \
+         -compatibility_version 1 \
+         -install_name /usr/lib/libc++abi.dylib \
++        -Wl,-undefined,dynamic_lookup \
+         -lSystem"
+ 	if [ -f "${SDKROOT}/usr/local/lib/libCrashReporterClient.a" ]
+ 	then
+@@ -91,7 +92,7 @@ case $TRIPLE in
+   done
+   ;;
+ esac
+-$CC *.o $RC_CFLAGS $LDSHARED_FLAGS $EXTRA_FLAGS
++$CC *.o $RC_CFLAGS $EXTRA_LDFLAGS $LDSHARED_FLAGS $EXTRA_FLAGS
+ 
+ if [ -z $RC_XBS ]
+ then
