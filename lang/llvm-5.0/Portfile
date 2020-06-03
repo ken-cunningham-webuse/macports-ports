@@ -365,7 +365,9 @@ platform darwin {
     # problematic, but luckily there is just a limited set of such dependents.
 
     configure.cxx_stdlib libc++
-    depends_lib-append port:libcxx
+    # clang-5.0 will be satisfied by libcxx-bootstrap if installed
+    # but later clangs will call in libcxx, which enables emulated_tls
+    depends_lib-append path:/usr/lib/libc++.dylib:libcxx-bootstrap
     supported_archs i386 x86_64
 
     pre-fetch {
