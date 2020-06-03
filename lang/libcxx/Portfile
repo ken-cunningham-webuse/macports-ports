@@ -89,23 +89,12 @@ if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
     if {${os.major} < 11} {
         variant emulated_tls description {build libcxxabi and libcxx with support for emulated thread_local storage} {}
 
-        # only selected clang versions support emulated_tls, and the emulated_tls variant
-        # needs to be enabled to build libcxx with emulated_tls support
-        foreach clang_c ${compiler.fallback} {
-            if {[string match macports-clang-* $clang_c]} {
-                # Extract version number from macports clang compiler name
-                set clang_v [lindex [split $clang_c -] 2]
-                if { ${clang_v} >= 5.0 } {
-                    if {[file exists ${prefix}/bin/clang-mp-${clang_v}]} {
-                        if {[active_variants clang-${clang_v} emulated_tls]} {
-                            ui_debug "Adding ${clang_c} to compiler whitelist"
-                            default_variants-append +emulated_tls
-                            compiler.whitelist-prepend ${clang_c}
-                        }
-                    }
-                }
-            }
+        # to allow bootstrapping to emulated_tls, we are going to force libcxx to build with clang-5.0
+        if {![active_variants clang-5.0 emulated_tls]} {
+            ui_error "$name requires clang-5.0 to be installed with the emulated_tls variant enabled"
+            error "unsupported configuration"
         }
+        compiler.whitelist macports-clang-5.0
     }
 
     compiler.blacklist *gcc* {clang < 500}
