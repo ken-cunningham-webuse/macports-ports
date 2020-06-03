@@ -152,6 +152,12 @@ if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
 
     post-patch {
         system "chmod 755 ${libcxx_worksrcpath}/lib/buildit"
+
+        if {${os.major} < 9} {
+            foreach header [glob ${workpath}/libcxx-${version}.src/include/*] {
+                reinplace "s|Availability.h|AvailabilityMacros.h|g" ${header}
+            }
+        }
     }
 
     build.dir ${workpath}/build
