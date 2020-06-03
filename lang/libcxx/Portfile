@@ -136,10 +136,7 @@ if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
 
     # patches for libc++abi buildit
     patchfiles-append \
-        0001-libcxxabi-Update-buildit-script-to-read-EXTRA_LDFLAGS-from-the.patch \
-        0002-libcxxabi-Define-_LIBCPP_BUILDING_LIBRARY-during-build-to-supp.patch \
-        0003-libcxxabi-buildit-Use-undefined-dynamic_lookup-when-linking.patch    \
-        0004-libcxxabi-buildit-add-nostdinc++.diff
+        patch-libcxxbootstrap-allpatches.diff
 
     if {[variant_isset emulated_tls]} {
       # add emutls.c support for cxa_thread_atexit directly into libcxxabi
@@ -150,21 +147,6 @@ if {${os.major} < 11 || [variant_isset replacemnt_libcxx]} {
         0007-libcxxabi-include-expose-cxa-thread-atexit.patch                     \
         0008-libcxxabi-cxa-thread-atexit-no-weak-atexit-impl.patch
     }
-
-    # restore libc++ buildit and patches for libc++ buildit
-    patchfiles-append \
-        1001-Revert-Remove-the-buildit-and-testit-scripts-they-ha.patch          \
-        1002-libcxx-buildit-build-fix-for-Leopard.patch \
-        1003-libcxx-buildit-Set-compatibility-version-to-RC_ProjectSourc.patch \
-        1004-libcxx-MacPorts-Use-LIBCXXABI_PATH-for-path-to-build-time-l.patch \
-        1005-libcxx-buildit-Fix-CFLAGS-for-Leopard-and-Snow-Leopard-to-i.patch
-
-    # patches for libc++ include files
-    patchfiles-append \
-        2001-Fix-local-and-iterator-when-building-with-Lion-and-n.patch    \
-        2002-Fix-missing-long-long-math-prototypes-when-using-the.patch    \
-        2003-implement-atomic-using-mutex-lock_guard-for-64b-ops-.patch    \
-        2004-libcxx-includes-Fix-up-thread-constexpr-for-GCC-where-the-PPC-port-cant-do-longlong-constexpr.patch
 
     post-patch {
         system "chmod 755 ${libcxx_worksrcpath}/lib/buildit"
