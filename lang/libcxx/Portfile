@@ -61,14 +61,6 @@ set libcxxabi_worksrcpath   [file join ${workpath} ${libcxxabi_distname}]
 set libcxx_worksrcpath      [file join ${workpath} ${libcxx_distname}]
 
 platform darwin {
-    if {${os.major} < 9} {
-        known_fail      yes
-        pre-fetch {
-            ui_error "${name} is not supported on Tiger or earlier."
-            error "unsupported platform"
-        }
-    }
-
     if {${os.major} < 11} {
         post-activate {
             set dirs /
