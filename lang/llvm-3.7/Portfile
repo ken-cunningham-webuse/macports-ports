@@ -251,7 +251,8 @@ platform darwin {
     # problematic, but luckily there is just a limited set of such dependents.
 
     configure.cxx_stdlib libc++
-    depends_lib-append port:libcxx
+    # if there is no libc++ installed, then install libcxx-bootstrap
+    depends_lib-append path:/usr/lib/libc++.dylib:libcxx-bootstrap
     supported_archs i386 x86_64
 
     pre-fetch {
