@@ -369,10 +369,8 @@ platform darwin {
     # against llvm-3.5 needs to also be using libc++.  This is possibly
     # problematic, but luckily there is just a limited set of such dependents.
 
-    configure.cxx_stdlib libc++
-    # clang-5.0 will be satisfied by libcxx-bootstrap if installed
-    # but later clangs will call in libcxx, which enables emulated_tls
-    depends_lib-append path:/usr/lib/libc++.dylib:libcxx-bootstrap
+    configure.cxx_stdlib
+    depends_lib-append port:libcxx-bootstrap
     supported_archs i386 x86_64
 
     pre-fetch {
