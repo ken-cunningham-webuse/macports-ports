@@ -222,20 +222,26 @@ if {${subport} eq "llvm-${llvm_version}"} {
     configure.args-append --with-python=${pythonfullpath}
 }
 
-# llvm-3.5 and later requires a C++11 runtime
-# Xcode 4.3's clang (318.x) fails per https://trac.macports.org/ticket/44161
-# Xcode 4.5's clang (421.11.66) fails due to http://llvm.org/bugs/show_bug.cgi?id=20184
-# Xcode 4.6.3's clang (425.0.28) fails due to http://trac.macports.org/ticket/46897
-compiler.blacklist *gcc* {clang < 500}
-
-# Override the normal compiler fallback list entirely since we have
-# such specific requirements.
-compiler.fallback   clang
-
-# 3.4 is already needed to bootstrap libcxx, so is a good last resort
-# when the system clang is too old.
-if {${os.platform} eq "darwin" && ${os.major} < 16} {
-    compiler.fallback-append macports-clang-3.4
+if {${os.major} < 11} {
+    compiler.whitelist macports-clang-3.4
+    compiler.fallback
+    compiler.blacklist
+} else {
+	# llvm-3.5 and later requires a C++11 runtime
+	# Xcode 4.3's clang (318.x) fails per https://trac.macports.org/ticket/44161
+	# Xcode 4.5's clang (421.11.66) fails due to http://llvm.org/bugs/show_bug.cgi?id=20184
+	# Xcode 4.6.3's clang (425.0.28) fails due to http://trac.macports.org/ticket/46897
+	compiler.blacklist *gcc* {clang < 500}
+	
+	# Override the normal compiler fallback list entirely since we have
+	# such specific requirements.
+	compiler.fallback   clang
+	
+	# 3.4 is already needed to bootstrap libcxx, so is a good last resort
+	# when the system clang is too old.
+	if {${os.platform} eq "darwin" && ${os.major} < 16} {
+		compiler.fallback-append macports-clang-3.4
+	}
 }
 
 if {${subport} eq "llvm-${llvm_version}" && [vercmp $xcodeversion 4.3] < 0 && [string match "*macports*" ${configure.compiler}]} {

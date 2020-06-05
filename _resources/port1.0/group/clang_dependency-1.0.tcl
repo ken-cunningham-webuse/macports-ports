@@ -12,3 +12,6 @@ proc clang_dependency.extra_versions {versions} {
 }
 
 clang_dependency.extra_versions {devel 9.0 8.0 7.0 6.0 5.0}
+
+configure.cxx_stdlib
+depends_lib-append port:libcxx-bootstrap
