@@ -3,6 +3,7 @@
 PortSystem                  1.0
 PortGroup                   cmake 1.1
 PortGroup                   github 1.0
+PortGroup                   compiler_blacklist_versions 1.0
 
 github.setup                andrewrk libsoundio 2.0.0
 checksums                   rmd160  1e1c2c350137174593d84a32c6aa45fb18744367 \
@@ -25,6 +26,9 @@ long_description            libsoundio is a lightweight abstraction over \
                             behalf\; instead exposing the raw power of the \
                             underlying backend.
 
+# fatal error: 'stdatomic.h' file not found
+compiler.blacklist-append   {clang < 426}
+
 configure.args-append       -DBUILD_EXAMPLE_PROGRAMS=OFF \
                             -DBUILD_TESTS=OFF \
                             -DENABLE_JACK=OFF \
@@ -38,10 +42,14 @@ variant pulseaudio description {Enable PulseAudio support} {
     configure.args-replace  -DENABLE_PULSEAUDIO=OFF -DENABLE_PULSEAUDIO=ON
 }
 
-if {${os.platform} eq "darwin" && ${os.major} < 14} {
-    known_fail              yes
-    pre-fetch {
-        ui_error "${name} @${version} requires OS X 10.10 or greater."
-        return -code error "incompatible OS X version"
-    }
+variant jack description {Enable Jack support} {
+    depends_build-append    port:jack
+    configure.args-replace  -DENABLE_JACK=OFF -DENABLE_JACK=ON
+}
+
+# error: use of undeclared identifier 'kAudioObjectPropertyScopeInput'
+# 10.8+ https://developer.apple.com/documentation/coreaudio/1494464-anonymous/kaudioobjectpropertyscopeinput?language=objc
+if {${os.platform} eq "darwin" && ${os.major} < 12} {
+    configure.args-replace  -DENABLE_COREAUDIO=ON  -DENABLE_COREAUDIO=OFF
+    default_variants-append +pulseaudio
 }
