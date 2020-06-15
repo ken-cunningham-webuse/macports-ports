@@ -26,8 +26,12 @@ long_description            libsoundio is a lightweight abstraction over \
                             behalf\; instead exposing the raw power of the \
                             underlying backend.
 
+# uses C11
+compiler.c_standard         2011
+
+# in addition, have to blacklist the following clangs due to
 # fatal error: 'stdatomic.h' file not found
-compiler.blacklist-append   {clang < 426}
+compiler.blacklist-append   {clang < 601}
 
 configure.args-append       -DBUILD_EXAMPLE_PROGRAMS=OFF \
                             -DBUILD_TESTS=OFF \
