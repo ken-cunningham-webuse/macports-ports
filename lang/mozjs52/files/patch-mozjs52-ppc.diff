@@ -1,0 +1,109 @@
+diff --git build/build-clang/build-clang.py build/build-clang/build-clang.py
+index 697bbb9b..fddb2b8d 100755
+--- build/build-clang/build-clang.py
++++ build/build-clang/build-clang.py
+@@ -368,9 +368,9 @@ if __name__ == "__main__":
+ 
+     if is_darwin():
+         extra_cflags = []
+-        extra_cxxflags = ["-stdlib=libc++"]
++        extra_cxxflags = []
+         extra_cflags2 = []
+-        extra_cxxflags2 = ["-stdlib=libc++"]
++        extra_cxxflags2 = []
+     elif is_linux():
+         extra_cflags = ["-static-libgcc"]
+         extra_cxxflags = ["-static-libgcc", "-static-libstdc++"]
+diff --git build/clang-plugin/moz.build build/clang-plugin/moz.build
+index d9b20cd9..c8ea806e 100644
+--- build/clang-plugin/moz.build
++++ build/clang-plugin/moz.build
+@@ -15,8 +15,8 @@ NO_VISIBILITY_FLAGS = True
+ 
+ # libc++ is required to build plugins against clang on OS X.
+ if CONFIG['HOST_OS_ARCH'] == 'Darwin':
+-    CXXFLAGS += ['-stdlib=libc++']
+-    LDFLAGS += ['-lc++']
++    CXXFLAGS += []
++    LDFLAGS += []
+ 
+ DIRS += [
+     'tests',
+diff --git js/src/old-configure js/src/old-configure
+index de0f8779..961602c7 100644
+--- js/src/old-configure
++++ js/src/old-configure
+@@ -4968,7 +4968,7 @@ case "$target" in
+     MKCSHLIB='$(CC) $(CFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
+     MOZ_OPTIMIZE_FLAGS="-O3 -fno-stack-protector"
+     CFLAGS="$CFLAGS -fno-common"
+-    CXXFLAGS="$CXXFLAGS -fno-common -stdlib=libc++"
++    CXXFLAGS="$CXXFLAGS -fno-common"
+     DLL_SUFFIX=".dylib"
+     DSO_LDOPTS=''
+     STRIP="$STRIP -x -S"
+diff --git js/src/old-configure.in js/src/old-configure.in
+index ff0617e3..ba19a6ef 100644
+--- js/src/old-configure.in
++++ js/src/old-configure.in
+@@ -604,7 +604,7 @@ case "$target" in
+     MKCSHLIB='$(CC) $(CFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
+     MOZ_OPTIMIZE_FLAGS="-O3 -fno-stack-protector"
+     CFLAGS="$CFLAGS -fno-common"
+-    CXXFLAGS="$CXXFLAGS -fno-common -stdlib=libc++"
++    CXXFLAGS="$CXXFLAGS -fno-common"
+     DLL_SUFFIX=".dylib"
+     DSO_LDOPTS=''
+     STRIP="$STRIP -x -S"
+diff --git js/src/threading/posix/Thread.cpp js/src/threading/posix/Thread.cpp
+index 2572cc72..21f20c21 100644
+--- js/src/threading/posix/Thread.cpp
++++ js/src/threading/posix/Thread.cpp
+@@ -153,7 +153,11 @@ js::ThisThread::SetName(const char* name)
+ 
+   int rv;
+ #ifdef XP_DARWIN
++#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ >= 1060
+   rv = pthread_setname_np(name);
++#else
++  rv = 0;
++#endif
+ #elif defined(__DragonFly__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+   pthread_set_name_np(pthread_self(), name);
+   rv = 0;
+diff --git js/src/wasm/WasmSignalHandlers.cpp js/src/wasm/WasmSignalHandlers.cpp
+index 78d21369..6e643a29 100644
+--- js/src/wasm/WasmSignalHandlers.cpp
++++ js/src/wasm/WasmSignalHandlers.cpp
+@@ -347,7 +347,7 @@ enum { REG_EIP = 14 };
+ // the same as CONTEXT, but on Mac we use a different structure since we call
+ // into the emulator code from a Mach exception handler rather than a
+ // sigaction-style signal handler.
+-#if defined(XP_DARWIN)
++#if defined(XP_DARWIN) && !defined(__powerpc__)
+ # if defined(JS_CPU_X64)
+ struct macos_x64_context {
+     x86_thread_state64_t thread;
+@@ -869,7 +869,7 @@ WasmFaultHandler(LPEXCEPTION_POINTERS exception)
+     return EXCEPTION_CONTINUE_SEARCH;
+ }
+ 
+-#elif defined(XP_DARWIN)
++#elif defined(XP_DARWIN) && !defined(__powerpc__)
+ # include <mach/exc.h>
+ 
+ static uint8_t**
+diff --git memory/mozjemalloc/jemalloc.c memory/mozjemalloc/jemalloc.c
+index 5d4d83a2..f0e24b5e 100644
+--- memory/mozjemalloc/jemalloc.c
++++ memory/mozjemalloc/jemalloc.c
+@@ -6139,7 +6139,7 @@ malloc_shutdown()
+  *
+  * This means that NO_MAC_JEMALLOC doesn't work on i386.
+  */
+-#if defined(MOZ_MEMORY_DARWIN) && !defined(__i386__) && !defined(MOZ_REPLACE_MALLOC)
++#if defined(MOZ_MEMORY_DARWIN) && !defined(__i386__) && !defined(__powerpc__) && !defined(MOZ_REPLACE_MALLOC)
+ #define DARWIN_ONLY(A) if (!osx_use_jemalloc) { A; }
+ #else
+ #define DARWIN_ONLY(A)
+

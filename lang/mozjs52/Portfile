@@ -68,6 +68,18 @@ configure.args      --with-system-icu \
                     --disable-readline \
                     --enable-threadsafe
 
+platform darwin powerpc {
+    configure.cxx-append -D__powerpc__
+    configure.cc-append  -D__powerpc__
+
+    patchfiles    patch-mozjs52-ppc.diff
+
+    # builds through but link fails
+    # ld: duplicate symbol void js::jit::MacroAssembler::storeDouble<js::jit::Address>(js::jit::FloatRegister, js::jit::Address const&) in Unified_cpp_js_src12.o and Unified_cpp_js_src10.o for architecture ppc
+    # defined in js/src/jit/MacroAssembler-inl.h
+    # why multiply defined?
+}
+
 build.env-append    SHELL=/bin/bash
 build.dir           ${worksrcpath}/js/src/obj
 destroot.dir        ${worksrcpath}/js/src/obj
@@ -96,7 +108,7 @@ if {[variant_isset universal]} {
             --host=i686-apple-${os.platform}${os.major} \
             --build=i686-apple-${os.platform}${os.major} \
             --target=i686-apple-${os.platform}${os.major}
-    } elseif {${build_arch} eq "x86_64"} {
+    } elseif {${build_arch} in "x86_64 ppc ppc64"} {
         configure.args-append \
             --host=${build_arch}-apple-${os.platform}${os.major} \
             --build=${build_arch}-apple-${os.platform}${os.major} \
