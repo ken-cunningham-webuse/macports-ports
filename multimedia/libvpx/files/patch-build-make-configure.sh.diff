@@ -5,7 +5,7 @@
        ;;
      x86*-darwin*)
 -      osx_sdk_dir="$(show_darwin_sdk_path macosx)"
-+      osx_sdk_dir="$(configure.sdkroot)"
++      osx_sdk_dir="${SDKROOT}"
        if [ -d "${osx_sdk_dir}" ]; then
          add_cflags  "-isysroot ${osx_sdk_dir}"
          add_ldflags "-isysroot ${osx_sdk_dir}"
