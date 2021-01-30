@@ -1,0 +1,1675 @@
+From 5d60b7909ac0996f506a7a651b8a94e2462a1517 Mon Sep 17 00:00:00 2001
+From: Sam Bingner <sam@bingner.com>
+Date: Fri, 3 Jan 2020 00:34:02 -1000
+Subject: [PATCH] Add elucubratus tapi patches
+
+---
+ llvm/projects/tapi/CMakeLists.txt             | 17 ++++--
+ .../tapi/include/tapi/Core/Architecture.def   |  4 ++
+ .../include/tapi/Core/ArchitectureSupport.h   |  4 +-
+ .../tapi/include/tapi/Core/FileManager.h      |  7 ++-
+ .../tapi/include/tapi/Core/HeaderFile.h       |  1 +
+ .../tapi/include/tapi/Core/Platform.h         |  2 +
+ llvm/projects/tapi/include/tapi/Core/YAML.h   |  6 +-
+ .../tapi/Diagnostics/DiagnosticTAPIKinds.td   |  9 +++
+ .../tapi/include/tapi/Driver/Configuration.h  |  4 +-
+ .../include/tapi/Driver/ConfigurationFile.h   | 12 ++--
+ .../tapi/include/tapi/Driver/Options.h        |  2 +-
+ .../include/tapi/Driver/SnapshotFileSystem.h  | 18 +++---
+ .../tapi/include/tapi/Driver/StatRecorder.h   | 18 +++---
+ .../tapi/include/tapi/Frontend/Frontend.h     |  4 +-
+ .../include/tapi/Frontend/FrontendContext.h   |  2 +-
+ .../tapi/include/tapi/LinkerInterfaceFile.h   |  2 +
+ llvm/projects/tapi/lib/Core/CMakeLists.txt    | 17 ++++++
+ llvm/projects/tapi/lib/Core/FileManager.cpp   |  8 +--
+ .../tapi/lib/Core/InterfaceFileManager.cpp    |  9 ++-
+ .../tapi/lib/Core/MachODylibReader.cpp        | 26 +++------
+ llvm/projects/tapi/lib/Core/Path.cpp          |  8 +--
+ llvm/projects/tapi/lib/Core/Platform.cpp      |  8 +++
+ llvm/projects/tapi/lib/Core/Registry.cpp      |  6 +-
+ llvm/projects/tapi/lib/Core/YAML.cpp          | 21 ++++---
+ .../tapi/lib/Diagnostics/Diagnostics.cpp      |  4 +-
+ .../tapi/lib/Driver/Configuration.cpp         |  4 +-
+ .../tapi/lib/Driver/ConfigurationFile.cpp     |  4 +-
+ .../tapi/lib/Driver/DirectoryScanner.cpp      | 45 ++++++++-------
+ llvm/projects/tapi/lib/Driver/DriverUtils.cpp |  6 +-
+ llvm/projects/tapi/lib/Driver/HeaderGlob.cpp  |  2 +-
+ .../tapi/lib/Driver/InstallAPIDriver.cpp      | 42 ++++++++------
+ llvm/projects/tapi/lib/Driver/Options.cpp     | 26 ++++-----
+ .../tapi/lib/Driver/ReexportDriver.cpp        |  4 +-
+ llvm/projects/tapi/lib/Driver/Snapshot.cpp    | 39 +++++++------
+ .../tapi/lib/Driver/SnapshotFileSystem.cpp    | 45 +++++++++++----
+ llvm/projects/tapi/lib/Driver/StubDriver.cpp  | 19 ++++---
+ llvm/projects/tapi/lib/Frontend/APIVisitor.h  |  2 +-
+ llvm/projects/tapi/lib/Frontend/Frontend.cpp  | 55 ++++++++++---------
+ .../tapi/lib/Frontend/FrontendContext.cpp     |  2 +-
+ llvm/projects/tapi/tools/CMakeLists.txt       |  2 +-
+ .../tapi/tools/libtapi/CMakeLists.txt         |  7 ++-
+ .../tools/libtapi/LinkerInterfaceFile.cpp     |  4 ++
+ llvm/projects/tapi/tools/libtapi/libtapi.cpp  |  4 ++
+ llvm/projects/tapi/tools/tapi/CMakeLists.txt  |  2 +-
+ 44 files changed, 316 insertions(+), 217 deletions(-)
+
+diff --git a/llvm/projects/tapi/CMakeLists.txt b/llvm/projects/tapi/CMakeLists.txt
+index d231a0634311..edd74c41e43c 100644
+--- a/llvm/projects/tapi/CMakeLists.txt
++++ b/llvm/projects/tapi/CMakeLists.txt
+@@ -1,6 +1,6 @@
+-if(NOT APPLE)
+-  message(FATAL_ERROR "Unsupported configuration.")
+-endif()
++#if(NOT APPLE)
++#  message(FATAL_ERROR "Unsupported configuration.")
++#endif()
+ 
+ set(TAPI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+ set(TAPI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+@@ -38,11 +38,11 @@ endif()
+ if(DEFINED ENV{RC_SUPPORTED_ARCHS})
+   string(REPLACE " " ";" TAPI_SUPPORTED_ARCHS $ENV{RC_SUPPORTED_ARCHS})
+ elseif(NOT DEFINED TAPI_SUPPORTED_ARCHS)
+-  set(TAPI_SUPPORTED_ARCHS i386 x86_64 x86_64h armv4t armv6 armv5 armv7 armv7s armv7k armv6m armv7m armv7em arm64)
++  set(TAPI_SUPPORTED_ARCHS i386 x86_64 x86_64h armv4t armv6 armv5 armv7 armv7s armv7k armv6m armv7m armv7em arm64 arm64e)
+ endif()
+ message(STATUS "Supported Architectures: ${TAPI_SUPPORTED_ARCHS}")
+ 
+-set(KNOWN_ARCHS i386 x86_64 x86_64h armv4t armv6 armv5 armv7 armv7s armv7k armv6m armv7m armv7em arm64)
++set(KNOWN_ARCHS i386 x86_64 x86_64h armv4t armv6 armv5 armv7 armv7s armv7k armv6m armv7m armv7em arm64 arm64e)
+ 
+ set (CONFIG_FILE ${CMAKE_CURRENT_BINARY_DIR}/include/tapi/Core/ArchitectureConfig.h)
+ file(WRITE ${CONFIG_FILE} "#ifndef TAPI_CORE_ARCHITECTURE_CONFIG_H\n")
+@@ -171,6 +171,13 @@ include_directories(BEFORE
+   ${CMAKE_CURRENT_SOURCE_DIR}/include
+   )
+ 
++if (LLVM_EXTERNAL_CLANG_SOURCE_DIR)
++    include_directories(${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include)
++else ()
++    include_directories(${CMAKE_SOURCE_DIR}/tools/clang/include)
++endif ()
++include_directories("${CMAKE_CURRENT_BINARY_DIR}/../../tools/clang/include")
++
+ option(TAPI_INCLUDE_TESTS "Generate build targets for the TAPI unit tests."
+        ${LLVM_INCLUDE_TESTS})
+ option(TAPI_INCLUDE_DOCS "Generate build targets for the TAPI docs."
+diff --git a/llvm/projects/tapi/include/tapi/Core/Architecture.def b/llvm/projects/tapi/include/tapi/Core/Architecture.def
+index 32b4bb584c30..58559db3caf5 100644
+--- a/llvm/projects/tapi/include/tapi/Core/Architecture.def
++++ b/llvm/projects/tapi/include/tapi/Core/Architecture.def
+@@ -70,3 +70,7 @@ ARCHINFO(armv7em, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V7EM)
+ ARCHINFO(arm64, MachO::CPU_TYPE_ARM64, MachO::CPU_SUBTYPE_ARM64_ALL)
+ #endif
+ 
++#ifdef SUPPORT_ARCH_ARM64E
++ARCHINFO(arm64e, MachO::CPU_TYPE_ARM64, MachO::CPU_SUBTYPE_ARM64E)
++#endif
++
+diff --git a/llvm/projects/tapi/include/tapi/Core/ArchitectureSupport.h b/llvm/projects/tapi/include/tapi/Core/ArchitectureSupport.h
+index 148c5cacbcff..e988e962d645 100644
+--- a/llvm/projects/tapi/include/tapi/Core/ArchitectureSupport.h
++++ b/llvm/projects/tapi/include/tapi/Core/ArchitectureSupport.h
+@@ -21,7 +21,7 @@
+ #include "tapi/LinkerInterfaceFile.h"
+ #include "tapi/PackedVersion32.h"
+ #include "tapi/tapi.h"
+-#include "clang/Basic/VersionTuple.h"
++#include "llvm/Support/VersionTuple.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/Support/raw_ostream.h"
+ #include <utility>
+@@ -35,7 +35,7 @@ struct PackedVersion {
+   constexpr PackedVersion(uint32_t version) : _version(version) {}
+   PackedVersion(unsigned major, unsigned minor, unsigned subminor)
+       : _version((major << 16) | ((minor & 0xff) << 8) | (subminor & 0xff)) {}
+-  PackedVersion(clang::VersionTuple version) {
++  PackedVersion(llvm::VersionTuple version) {
+     _version = version.getMajor() << 16;
+     if (auto minor = version.getMinor())
+       _version |= (*minor & 0xff) << 8;
+diff --git a/llvm/projects/tapi/include/tapi/Core/FileManager.h b/llvm/projects/tapi/include/tapi/Core/FileManager.h
+index 3a1ab5bfea43..cd6a47ea95c2 100644
+--- a/llvm/projects/tapi/include/tapi/Core/FileManager.h
++++ b/llvm/projects/tapi/include/tapi/Core/FileManager.h
+@@ -47,14 +47,17 @@ class FileManager final : public clang::FileManager {
+   FileManager(const clang::FileSystemOptions &fileSystemOpts,
+               llvm::IntrusiveRefCntPtr<FileSystemStatCacheFactory>
+                   cacheFactory = nullptr,
+-              llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> fs = nullptr);
++              llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs = nullptr);
+ 
+   /// \brief Check if a particular path exists.
+   bool exists(StringRef path);
+ 
+   /// \brief Check if a particular path is a directory.
+   bool isDirectory(StringRef path, bool CacheFailure = true) {
+-    return getDirectory(path, CacheFailure) != nullptr;
++    if (auto DirEntry = getDirectory(path, CacheFailure))
++       return true;
++    else
++       return false;
+   }
+ 
+   /// \brief Check if a particular path is a symlink using directory_iterator.
+diff --git a/llvm/projects/tapi/include/tapi/Core/HeaderFile.h b/llvm/projects/tapi/include/tapi/Core/HeaderFile.h
+index eaf5f77596c2..baeb61065baf 100644
+--- a/llvm/projects/tapi/include/tapi/Core/HeaderFile.h
++++ b/llvm/projects/tapi/include/tapi/Core/HeaderFile.h
+@@ -19,6 +19,7 @@
+ #include "tapi/Defines.h"
+ #include "llvm/ADT/StringRef.h"
+ #include <string>
++#include <vector>
+ 
+ TAPI_NAMESPACE_INTERNAL_BEGIN
+ 
+diff --git a/llvm/projects/tapi/include/tapi/Core/Platform.h b/llvm/projects/tapi/include/tapi/Core/Platform.h
+index afe19df8ae23..3293d48a7dac 100644
+--- a/llvm/projects/tapi/include/tapi/Core/Platform.h
++++ b/llvm/projects/tapi/include/tapi/Core/Platform.h
+@@ -34,6 +34,8 @@ enum class Platform : uint8_t {
+   watchOS,
+   watchOSSimulator,
+   bridgeOS,
++  iOSMac,
++  zippered
+ };
+ 
+ Platform mapToSim(Platform platform, bool wantSim);
+diff --git a/llvm/projects/tapi/include/tapi/Core/YAML.h b/llvm/projects/tapi/include/tapi/Core/YAML.h
+index 83d673d51415..f4f0395733ce 100644
+--- a/llvm/projects/tapi/include/tapi/Core/YAML.h
++++ b/llvm/projects/tapi/include/tapi/Core/YAML.h
+@@ -22,6 +22,7 @@
+ #include "tapi/Core/Platform.h"
+ #include "tapi/Core/YAMLReaderWriter.h"
+ #include "clang/Frontend/FrontendOptions.h"
++#include "clang/Basic/LangStandard.h"
+ #include "llvm/ADT/StringSwitch.h"
+ #include "llvm/Support/YAMLTraits.h"
+ 
+@@ -90,9 +91,8 @@ template <> struct ScalarTraits<UUID> {
+   static QuotingType mustQuote(StringRef);
+ };
+ 
+-using clang::InputKind;
+-template <> struct ScalarEnumerationTraits<InputKind::Language> {
+-  static void enumeration(IO &io, InputKind::Language &kind);
++template <> struct ScalarEnumerationTraits<clang::Language> {
++  static void enumeration(IO &io, clang::Language &kind);
+ };
+ 
+ } // end namespace yaml.
+diff --git a/llvm/projects/tapi/include/tapi/Diagnostics/DiagnosticTAPIKinds.td b/llvm/projects/tapi/include/tapi/Diagnostics/DiagnosticTAPIKinds.td
+index 76eb0256af4c..011b5a50482d 100644
+--- a/llvm/projects/tapi/include/tapi/Diagnostics/DiagnosticTAPIKinds.td
++++ b/llvm/projects/tapi/include/tapi/Diagnostics/DiagnosticTAPIKinds.td
+@@ -35,6 +35,15 @@ class DiagCategory<string Name> {
+   string CategoryName = Name;
+ }
+ 
++// Textual substitutions which may be performed on the text of diagnostics
++class TextSubstitution<string Text> {
++  string Substitution = Text;
++  // TODO: These are only here to allow substitutions to be declared inline with
++  // diagnostics
++  string Component = "";
++  string CategoryName = "";
++}
++
+ // Diagnostic Groups.
+ class DiagGroup<string Name, list<DiagGroup> subgroups = []> {
+   string GroupName = Name;
+diff --git a/llvm/projects/tapi/include/tapi/Driver/Configuration.h b/llvm/projects/tapi/include/tapi/Driver/Configuration.h
+index b7eff6d13e5e..a01d7c8d5d06 100644
+--- a/llvm/projects/tapi/include/tapi/Driver/Configuration.h
++++ b/llvm/projects/tapi/include/tapi/Driver/Configuration.h
+@@ -33,7 +33,7 @@ class FileManager;
+ class Context;
+ 
+ struct CommandLineConfiguration {
+-  clang::InputKind::Language language = clang::InputKind::Unknown;
++  clang::Language language = clang::Language::Unknown;
+   std::string std;
+   std::string isysroot;
+   std::string publicUmbrellaHeaderPath;
+@@ -68,7 +68,7 @@ struct Configuration {
+                         Context &context);
+ 
+   StringRef getSysRoot() const;
+-  clang::InputKind::Language getLanguage(StringRef path) const;
++  clang::Language getLanguage(StringRef path) const;
+   const std::vector<Macro> &getMacros(StringRef path) const;
+   const PathSeq &getIncludePaths(StringRef path) const;
+   const PathSeq &getFrameworkPaths(StringRef path) const;
+diff --git a/llvm/projects/tapi/include/tapi/Driver/ConfigurationFile.h b/llvm/projects/tapi/include/tapi/Driver/ConfigurationFile.h
+index 1cd0c8490ca1..a9b997eaa56c 100644
+--- a/llvm/projects/tapi/include/tapi/Driver/ConfigurationFile.h
++++ b/llvm/projects/tapi/include/tapi/Driver/ConfigurationFile.h
+@@ -38,8 +38,8 @@ class IO;
+ TAPI_NAMESPACE_INTERNAL_BEGIN
+ 
+ using Macro = std::pair<std::string, bool>;
+-static const clang::InputKind::Language defaultLanguage =
+-    clang::InputKind::ObjC;
++static const clang::Language defaultLanguage =
++    clang::Language::ObjC;
+ 
+ namespace configuration {
+ namespace v1 {
+@@ -54,7 +54,7 @@ struct FrameworkConfiguration {
+   std::string name;
+   std::string path;
+   std::string installName;
+-  clang::InputKind::Language language;
++  clang::Language language;
+   PathSeq includePaths;
+   PathSeq frameworkPaths;
+   std::vector<Macro> macros;
+@@ -65,7 +65,7 @@ struct FrameworkConfiguration {
+ struct DylibConfiguration {
+   std::string name;
+   std::string installName;
+-  clang::InputKind::Language language;
++  clang::Language language;
+   PathSeq includePaths;
+   PathSeq binaries;
+   std::vector<Macro> macros;
+@@ -77,7 +77,7 @@ struct Configuration {
+   Platform platform;
+   PackedVersion version;
+   std::string isysroot;
+-  clang::InputKind::Language language;
++  clang::Language language;
+   PathSeq includePaths;
+   PathSeq frameworkPaths;
+   std::vector<Macro> macros;
+@@ -107,7 +107,7 @@ class ConfigurationFile : public File {
+   Platform platform;
+   PackedVersion version;
+   std::string isysroot;
+-  clang::InputKind::Language language;
++  clang::Language language;
+   PathSeq includePaths;
+   PathSeq frameworkPaths;
+   std::vector<Macro> macros;
+diff --git a/llvm/projects/tapi/include/tapi/Driver/Options.h b/llvm/projects/tapi/include/tapi/Driver/Options.h
+index af786a2765e5..1fc9e155b86c 100644
+--- a/llvm/projects/tapi/include/tapi/Driver/Options.h
++++ b/llvm/projects/tapi/include/tapi/Driver/Options.h
+@@ -169,7 +169,7 @@ struct FrontendOptions {
+   std::vector<llvm::Triple> targets;
+ 
+   /// \brief Specify the language to use for parsing.
+-  clang::InputKind::Language language = clang::InputKind::ObjC;
++  clang::Language language = clang::Language::ObjC;
+ 
+   /// \brief Language standard to use for parsing.
+   std::string language_std;
+diff --git a/llvm/projects/tapi/include/tapi/Driver/SnapshotFileSystem.h b/llvm/projects/tapi/include/tapi/Driver/SnapshotFileSystem.h
+index ff0073579335..e77ad2ad39f7 100644
+--- a/llvm/projects/tapi/include/tapi/Driver/SnapshotFileSystem.h
++++ b/llvm/projects/tapi/include/tapi/Driver/SnapshotFileSystem.h
+@@ -16,23 +16,23 @@
+ 
+ #include "tapi/Core/LLVM.h"
+ #include "tapi/Defines.h"
+-#include "clang/Basic/VirtualFileSystem.h"
+ #include "llvm/ADT/IntrusiveRefCntPtr.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/ADT/Twine.h"
+ #include "llvm/Support/Debug.h"
+ #include "llvm/Support/ErrorOr.h"
+ #include "llvm/Support/Path.h"
++#include "llvm/Support/VirtualFileSystem.h"
+ #include <string>
+ 
+-using clang::vfs::directory_iterator;
+-using clang::vfs::File;
+-using clang::vfs::Status;
++using llvm::vfs::directory_iterator;
++using llvm::vfs::File;
++using llvm::vfs::Status;
+ 
+ TAPI_NAMESPACE_INTERNAL_BEGIN
+ 
+ /// \brief The snapshot virtual file system.
+-class SnapshotFileSystem final : public clang::vfs::FileSystem {
++class SnapshotFileSystem final : public llvm::vfs::FileSystem {
+ private:
+   enum class EntryKind { Directory, File };
+ 
+@@ -54,7 +54,7 @@ class SnapshotFileSystem final : public clang::vfs::FileSystem {
+   public:
+     DirectoryEntry(StringRef name)
+         : Entry(EntryKind::Directory, name),
+-          status(name, clang::vfs::getNextVirtualUniqueID(),
++          status(name, llvm::vfs::getNextVirtualUniqueID(),
+                  llvm::sys::TimePoint<>(), 0, 0, 0,
+                  llvm::sys::fs::file_type::directory_file,
+                  llvm::sys::fs::all_all) {}
+@@ -108,15 +108,15 @@ class SnapshotFileSystem final : public clang::vfs::FileSystem {
+ 
+ public:
+   SnapshotFileSystem(IntrusiveRefCntPtr<FileSystem> externalFS =
+-                         clang::vfs::getRealFileSystem())
+-      : root(llvm::make_unique<DirectoryEntry>("/")),
++                         llvm::vfs::getRealFileSystem())
++      : root(std::make_unique<DirectoryEntry>("/")),
+         externalFS(std::move(externalFS)) {}
+ 
+   /// \brief Get the status of the entry at \p Path, if one exists.
+   llvm::ErrorOr<Status> status(const Twine &path) override;
+ 
+   /// \brief Get a \p File object for the file at \p Path, if one exists.
+-  llvm::ErrorOr<std::unique_ptr<clang::vfs::File>>
++  llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
+   openFileForRead(const Twine &path) override;
+ 
+   /// \brief Get a directory_iterator for \p Dir.
+diff --git a/llvm/projects/tapi/include/tapi/Driver/StatRecorder.h b/llvm/projects/tapi/include/tapi/Driver/StatRecorder.h
+index da765e0a67be..cc9fa64ca667 100644
+--- a/llvm/projects/tapi/include/tapi/Driver/StatRecorder.h
++++ b/llvm/projects/tapi/include/tapi/Driver/StatRecorder.h
+@@ -18,6 +18,8 @@
+ #include "tapi/Driver/Snapshot.h"
+ #include "tapi/Driver/SnapshotFileSystem.h"
+ #include "clang/Basic/FileSystemStatCache.h"
++#include "clang/Sema/Lookup.h"
++#include "llvm/Support/VirtualFileSystem.h"
+ 
+ TAPI_NAMESPACE_INTERNAL_BEGIN
+ 
+@@ -28,21 +30,21 @@ class StatRecorder final : public clang::FileSystemStatCache {
+ public:
+   StatRecorder() = default;
+ 
+-  LookupResult getStat(StringRef path, clang::FileData &data, bool isFile,
+-                       std::unique_ptr<clang::vfs::File> *file,
+-                       clang::vfs::FileSystem &fs) override {
+-    auto result = statChained(path, data, isFile, file, fs);
++  std::error_code getStat(StringRef path, llvm::vfs::Status &status, bool isFile,
++                       std::unique_ptr<llvm::vfs::File> *file,
++                       llvm::vfs::FileSystem &fs) override {
++    auto err = get(path, status, isFile, file, nullptr, fs);
+ 
+     // Don't record non existing files and directories.
+-    if (result == CacheMissing)
+-      return result;
++    if (err)
++      return err;
+ 
+-    if (data.IsDirectory)
++    if (status.isDirectory())
+       TAPI_INTERNAL::globalSnapshot->recordDirectory(path);
+     else
+       TAPI_INTERNAL::globalSnapshot->recordFile(path);
+ 
+-    return result;
++    return std::error_code();
+   }
+ };
+ 
+diff --git a/llvm/projects/tapi/include/tapi/Frontend/Frontend.h b/llvm/projects/tapi/include/tapi/Frontend/Frontend.h
+index cf9ddb4c851e..2d2ca65500d6 100644
+--- a/llvm/projects/tapi/include/tapi/Frontend/Frontend.h
++++ b/llvm/projects/tapi/include/tapi/Frontend/Frontend.h
+@@ -28,9 +28,9 @@ TAPI_NAMESPACE_INTERNAL_BEGIN
+ struct FrontendJob {
+   std::string workingDirectory;
+   IntrusiveRefCntPtr<FileSystemStatCacheFactory> cacheFactory;
+-  IntrusiveRefCntPtr<clang::vfs::FileSystem> vfs;
++  IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs;
+   llvm::Triple target;
+-  clang::InputKind::Language language = clang::InputKind::Unknown;
++  clang::Language language = clang::Language::Unknown;
+   bool useRTTI = true;
+   bool enableModules = false;
+   bool validateSystemHeaders = false;
+diff --git a/llvm/projects/tapi/include/tapi/Frontend/FrontendContext.h b/llvm/projects/tapi/include/tapi/Frontend/FrontendContext.h
+index 34ef05123fd8..a6fb68759823 100644
+--- a/llvm/projects/tapi/include/tapi/Frontend/FrontendContext.h
++++ b/llvm/projects/tapi/include/tapi/Frontend/FrontendContext.h
+@@ -39,7 +39,7 @@ struct FrontendContext {
+   FrontendContext(
+       StringRef workingDirectory = StringRef(),
+       IntrusiveRefCntPtr<FileSystemStatCacheFactory> cacheFactory = nullptr,
+-      IntrusiveRefCntPtr<clang::vfs::FileSystem> vfs = nullptr);
++      IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
+ 
+   void visit(APIVisitor &visitor) { api.visit(visitor); }
+ };
+diff --git a/llvm/projects/tapi/include/tapi/LinkerInterfaceFile.h b/llvm/projects/tapi/include/tapi/LinkerInterfaceFile.h
+index a18d9bee8b84..6f8282cfb4ee 100644
+--- a/llvm/projects/tapi/include/tapi/LinkerInterfaceFile.h
++++ b/llvm/projects/tapi/include/tapi/LinkerInterfaceFile.h
+@@ -64,6 +64,8 @@ enum class Platform : unsigned {
+   /// \since 1.2
+   bridgeOS = 5,
+ 
++  iOSMac = 6,
++  zippered = 10
+ };
+ 
+ ///
+diff --git a/llvm/projects/tapi/lib/Core/CMakeLists.txt b/llvm/projects/tapi/lib/Core/CMakeLists.txt
+index cfc506d14dbd..88ef5fea5ebc 100644
+--- a/llvm/projects/tapi/lib/Core/CMakeLists.txt
++++ b/llvm/projects/tapi/lib/Core/CMakeLists.txt
+@@ -40,3 +40,20 @@ add_tapi_library(tapiCore
+   LINK_LIBS
+   clangBasic
+   )
++add_dependencies(tapiCore clang-resource-headers)
++if(Clang_DIR)
++    set(clang_lib_dir ${Clang_DIR}/../..)
++elseif(LLVM_DIR)
++    set(clang_lib_dir ${LLVM_DIR}/../..)
++elseif(LLVM_LIBRARY_DIRS)
++    set(clang_lib_dir ${LLVM_LIBRARY_DIRS})
++elseif(LLVM_BUILD_LIBRARY_DIR)
++    set(clang_lib_dir ${LLVM_BUILD_LIBRARY_DIR})
++elseif(LLVM_BINARY_DIR)
++    set(clang_lib_dir ${LLVM_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX})
++endif()
++set(clang_version ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH})
++set(clang_resource_headers_dir ${clang_lib_dir}/clang/${clang_version}/include)
++if(NOT EXISTS ${clang_resource_headers_dir})
++    message(WARNING "Expected directory for clang-resource headers not found: ${clang_resource_headers_dir}")
++endif()
+diff --git a/llvm/projects/tapi/lib/Core/FileManager.cpp b/llvm/projects/tapi/lib/Core/FileManager.cpp
+index 1566be165fac..787fd6aa0f07 100644
+--- a/llvm/projects/tapi/lib/Core/FileManager.cpp
++++ b/llvm/projects/tapi/lib/Core/FileManager.cpp
+@@ -15,7 +15,7 @@
+ #include "tapi/Core/FileManager.h"
+ #include "tapi/Defines.h"
+ #include "clang/Basic/FileSystemStatCache.h"
+-#include "clang/Basic/VirtualFileSystem.h"
++#include "llvm/Support/VirtualFileSystem.h"
+ #include "llvm/ADT/IntrusiveRefCntPtr.h"
+ #include "llvm/ADT/StringRef.h"
+ 
+@@ -38,7 +38,7 @@ FileManager::FileManager(
+ }
+ 
+ bool FileManager::exists(StringRef path) {
+-  clang::vfs::Status result;
++  vfs::Status result;
+   if (getNoncachedStatValue(path, result))
+     return false;
+   return result.exists();
+@@ -51,9 +51,9 @@ bool FileManager::isSymlink(StringRef path) {
+ }
+ 
+ void FileManager::installStatRecorder() {
+-  clearStatCaches();
++  clearStatCache();
+   if (cacheFactory != nullptr)
+-    addStatCache(std::unique_ptr<FileSystemStatCache>(cacheFactory->create()));
++    setStatCache(std::unique_ptr<FileSystemStatCache>(cacheFactory->create()));
+ }
+ 
+ TAPI_NAMESPACE_INTERNAL_END
+diff --git a/llvm/projects/tapi/lib/Core/InterfaceFileManager.cpp b/llvm/projects/tapi/lib/Core/InterfaceFileManager.cpp
+index 025943992a93..c5b200a29bf9 100644
+--- a/llvm/projects/tapi/lib/Core/InterfaceFileManager.cpp
++++ b/llvm/projects/tapi/lib/Core/InterfaceFileManager.cpp
+@@ -30,12 +30,11 @@ InterfaceFileManager::InterfaceFileManager(FileManager &fm) : _fm(fm) {
+ 
+ Expected<InterfaceFileBase *>
+ InterfaceFileManager::readFile(const std::string &path) {
+-  auto *file = _fm.getFile(path);
+-  if (file == nullptr)
+-    return errorCodeToError(
+-        std::make_error_code(std::errc::no_such_file_or_directory));
++  auto fileOrErr = _fm.getFile(path);
++  if (!fileOrErr)
++    return errorCodeToError(fileOrErr.getError());
+ 
+-  auto bufferOrErr = _fm.getBufferForFile(file);
++  auto bufferOrErr = _fm.getBufferForFile(fileOrErr.get());
+   if (!bufferOrErr)
+     return errorCodeToError(bufferOrErr.getError());
+ 
+diff --git a/llvm/projects/tapi/lib/Core/MachODylibReader.cpp b/llvm/projects/tapi/lib/Core/MachODylibReader.cpp
+index f77f63836a49..5c5bca59fba2 100644
+--- a/llvm/projects/tapi/lib/Core/MachODylibReader.cpp
++++ b/llvm/projects/tapi/lib/Core/MachODylibReader.cpp
+@@ -25,19 +25,6 @@
+ using namespace llvm;
+ using namespace llvm::object;
+ 
+-// Define missing platform enums.
+-namespace llvm {
+-namespace MachO {
+-// clang-format off
+-  enum MissingPlatformType {
+-    PLATFORM_IOSSIMULATOR     = 7,
+-    PLATFORM_TVOSSIMULATOR    = 8,
+-    PLATFORM_WATCHOSSIMULATOR = 9,
+-  };
+-// clang-format on
+-} // end namespace MachO.
+-} // end namespace llvm.
+-
+ TAPI_NAMESPACE_INTERNAL_BEGIN
+ 
+ Expected<FileType>
+@@ -266,12 +253,17 @@ static Error readMachOHeaderData(MachOObjectFile *object,
+   }
+ 
+   for (auto &section : object->sections()) {
+-    StringRef sectionName;
+-    section.getName(sectionName);
++    Expected<StringRef> sectionNameOrErr = section.getName();
++    if (!sectionNameOrErr) continue;
++    StringRef sectionName = sectionNameOrErr.get();
++
+     if (sectionName != "__objc_imageinfo" && sectionName != "__image_info")
+       continue;
+-    StringRef content;
+-    section.getContents(content);
++    Expected<StringRef> contentOrErr = section.getContents();
++    if (!contentOrErr) continue;
++
++    StringRef content = *contentOrErr;
++
+     if ((content.size() >= 8) && (content[0] == 0)) {
+       uint32_t flags;
+       if (object->isLittleEndian()) {
+diff --git a/llvm/projects/tapi/lib/Core/Path.cpp b/llvm/projects/tapi/lib/Core/Path.cpp
+index d25d1297478a..28612ad15284 100644
+--- a/llvm/projects/tapi/lib/Core/Path.cpp
++++ b/llvm/projects/tapi/lib/Core/Path.cpp
+@@ -17,7 +17,7 @@
+ #include "tapi/Core/LLVM.h"
+ #include "tapi/Core/Utils.h"
+ #include "tapi/Defines.h"
+-#include "clang/Basic/VirtualFileSystem.h"
++#include "llvm/Support/VirtualFileSystem.h"
+ #include "llvm/ADT/SmallString.h"
+ #include "llvm/ADT/Twine.h"
+ #include "llvm/Support/Error.h"
+@@ -54,8 +54,8 @@ enumerateFiles(FileManager &fm, StringRef path,
+                const std::function<bool(StringRef)> &func) {
+   PathSeq files;
+   std::error_code ec;
+-  auto &fs = *fm.getVirtualFileSystem();
+-  for (clang::vfs::recursive_directory_iterator i(fs, path, ec), ie; i != ie;
++  auto &fs = fm.getVirtualFileSystem();
++  for (llvm::vfs::recursive_directory_iterator i(fs, path, ec), ie; i != ie;
+        i.increment(ec)) {
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+@@ -67,7 +67,7 @@ enumerateFiles(FileManager &fm, StringRef path,
+     if (ec)
+       return errorCodeToError(ec);
+ 
+-    auto path = i->getName();
++    auto path = i->path();
+     if (func(path))
+       files.emplace_back(path);
+   }
+diff --git a/llvm/projects/tapi/lib/Core/Platform.cpp b/llvm/projects/tapi/lib/Core/Platform.cpp
+index 29e1ab476955..3ff15bcef40e 100644
+--- a/llvm/projects/tapi/lib/Core/Platform.cpp
++++ b/llvm/projects/tapi/lib/Core/Platform.cpp
+@@ -93,6 +93,10 @@ StringRef getPlatformName(Platform platform) {
+     return "tvOSSimulator";
+   case Platform::bridgeOS:
+     return "bridgeOS";
++  case Platform::iOSMac:
++    return "iOSMac";
++  case Platform::zippered:
++    return "zippered";
+   }
+ }
+ 
+@@ -116,6 +120,10 @@ std::string getOSAndEnvironmentName(Platform platform, std::string version) {
+     return "tvos" + version + "-simulator";
+   case Platform::bridgeOS:
+     return "bridgeos" + version;
++  case Platform::iOSMac:
++    return "iOSMac" + version;
++  case Platform::zippered:
++    return "zippered" + version;
+   }
+ }
+ 
+diff --git a/llvm/projects/tapi/lib/Core/Registry.cpp b/llvm/projects/tapi/lib/Core/Registry.cpp
+index 2dec731cef08..8e7bd3b7aa7e 100644
+--- a/llvm/projects/tapi/lib/Core/Registry.cpp
++++ b/llvm/projects/tapi/lib/Core/Registry.cpp
+@@ -149,7 +149,7 @@ void Registry::addBinaryReaders() {
+ }
+ 
+ void Registry::addYAMLReaders() {
+-  auto reader = make_unique<YAMLReader>();
++  auto reader = std::make_unique<YAMLReader>();
+   reader->add(
+       std::unique_ptr<DocumentHandler>(new stub::v1::YAMLDocumentHandler));
+   reader->add(
+@@ -160,7 +160,7 @@ void Registry::addYAMLReaders() {
+ }
+ 
+ void Registry::addYAMLWriters() {
+-  auto writer = make_unique<YAMLWriter>();
++  auto writer = std::make_unique<YAMLWriter>();
+   writer->add(
+       std::unique_ptr<DocumentHandler>(new stub::v1::YAMLDocumentHandler));
+   writer->add(
+@@ -174,6 +174,6 @@ void Registry::addReexportWriters() {
+   add(std::unique_ptr<Writer>(new ReexportFileWriter));
+ }
+ 
+-void Registry::addDiagnosticReader() { add(make_unique<DiagnosticReader>()); }
++void Registry::addDiagnosticReader() { add(std::make_unique<DiagnosticReader>()); }
+ 
+ TAPI_NAMESPACE_INTERNAL_END
+diff --git a/llvm/projects/tapi/lib/Core/YAML.cpp b/llvm/projects/tapi/lib/Core/YAML.cpp
+index 3aa286ecdfc5..74a036c559d1 100644
+--- a/llvm/projects/tapi/lib/Core/YAML.cpp
++++ b/llvm/projects/tapi/lib/Core/YAML.cpp
+@@ -55,6 +55,9 @@ void ScalarEnumerationTraits<Platform>::enumeration(IO &io,
+   io.enumCase(platform, "tvos", Platform::tvOS);
+   io.enumCase(platform, "tvos", Platform::tvOSSimulator);
+   io.enumCase(platform, "bridgeos", Platform::bridgeOS);
++
++  io.enumCase(platform, "iosmac", Platform::zippered);
++  io.enumCase(platform, "zippered", Platform::zippered);
+ }
+ 
+ using TAPI_INTERNAL::Architecture;
+@@ -191,16 +194,16 @@ QuotingType ScalarTraits<UUID>::mustQuote(StringRef) {
+   return QuotingType::Single;
+ }
+ 
+-using clang::InputKind;
+-void ScalarEnumerationTraits<InputKind::Language>::enumeration(
+-    IO &io, InputKind::Language &kind) {
+-  io.enumCase(kind, "c", InputKind::C);
+-  io.enumCase(kind, "cxx", InputKind::CXX);
+-  io.enumCase(kind, "objective-c", InputKind::ObjC);
+-  io.enumCase(kind, "objc", InputKind::ObjC); // to keep old snapshots working.
+-  io.enumCase(kind, "objective-cxx", InputKind::ObjCXX);
++using namespace clang;
++void ScalarEnumerationTraits<Language>::enumeration(
++    IO &io, Language &kind) {
++  io.enumCase(kind, "c", Language::C);
++  io.enumCase(kind, "cxx", Language::CXX);
++  io.enumCase(kind, "objective-c", Language::ObjC);
++  io.enumCase(kind, "objc", Language::ObjC); // to keep old snapshots working.
++  io.enumCase(kind, "objective-cxx", Language::ObjCXX);
+   io.enumCase(kind, "objcxx",
+-              InputKind::ObjCXX); // to keep old snapshots working.
++              Language::ObjCXX); // to keep old snapshots working.
+ }
+ 
+ } // end namespace yaml.
+diff --git a/llvm/projects/tapi/lib/Diagnostics/Diagnostics.cpp b/llvm/projects/tapi/lib/Diagnostics/Diagnostics.cpp
+index a7d658aea2a2..e2ed829ba9c1 100644
+--- a/llvm/projects/tapi/lib/Diagnostics/Diagnostics.cpp
++++ b/llvm/projects/tapi/lib/Diagnostics/Diagnostics.cpp
+@@ -140,7 +140,7 @@ void DiagnosticsEngine::setupDiagnosticsFile(StringRef output) {
+   raw_ostream *os = &llvm::errs();
+   if (output != "-") {
+     // Create the output stream.
+-    auto fileOS = llvm::make_unique<llvm::raw_fd_ostream>(
++    auto fileOS = std::make_unique<llvm::raw_fd_ostream>(
+         output, ec, llvm::sys::fs::F_Append | llvm::sys::fs::F_Text);
+     if (ec) {
+       report(diag::err_cannot_open_file) << output << ec.message();
+@@ -153,7 +153,7 @@ void DiagnosticsEngine::setupDiagnosticsFile(StringRef output) {
+   diagOpts->DiagnosticLogFile = output.str();
+ 
+   // Chain in the diagnostic client which will log the diagnostics.
+-  auto Logger = llvm::make_unique<clang::LogDiagnosticPrinter>(
++  auto Logger = std::make_unique<clang::LogDiagnosticPrinter>(
+       *os, diagOpts.get(), std::move(streamOwner));
+   assert(diag->ownsClient());
+   diag->setClient(new clang::ChainedDiagnosticConsumer(diag->takeClient(),
+diff --git a/llvm/projects/tapi/lib/Driver/Configuration.cpp b/llvm/projects/tapi/lib/Driver/Configuration.cpp
+index b0d5f02d0f40..0d6b6892748e 100644
+--- a/llvm/projects/tapi/lib/Driver/Configuration.cpp
++++ b/llvm/projects/tapi/lib/Driver/Configuration.cpp
+@@ -152,8 +152,8 @@ StringRef Configuration::getSysRoot() const {
+   return file.isysroot;
+ }
+ 
+-clang::InputKind::Language Configuration::getLanguage(StringRef path) const {
+-  if (commandLine.language != clang::InputKind::Unknown)
++clang::Language Configuration::getLanguage(StringRef path) const {
++  if (commandLine.language != clang::Language::Unknown)
+     return commandLine.language;
+ 
+   auto it = pathToConfig.find(getCanonicalPath(path));
+diff --git a/llvm/projects/tapi/lib/Driver/ConfigurationFile.cpp b/llvm/projects/tapi/lib/Driver/ConfigurationFile.cpp
+index 1a1b04a3b201..3ace0978279c 100644
+--- a/llvm/projects/tapi/lib/Driver/ConfigurationFile.cpp
++++ b/llvm/projects/tapi/lib/Driver/ConfigurationFile.cpp
+@@ -120,7 +120,7 @@ template <> struct MappingTraits<const ConfigurationFile *> {
+     Platform platform;
+     PackedVersion version;
+     std::string isysroot;
+-    clang::InputKind::Language language;
++    clang::Language language;
+     PathSeq includePaths;
+     PathSeq frameworkPaths;
+     std::vector<Macro> macros;
+@@ -135,7 +135,7 @@ template <> struct MappingTraits<const ConfigurationFile *> {
+     io.mapRequired("sdk-platform", keys->platform);
+     io.mapRequired("sdk-version", keys->version);
+     io.mapRequired("sdk-root", keys->isysroot);
+-    io.mapOptional("language", keys->language, clang::InputKind::ObjC);
++    io.mapOptional("language", keys->language, clang::Language::ObjC);
+     io.mapOptional("include-paths", keys->includePaths);
+     io.mapOptional("framework-paths", keys->frameworkPaths);
+     io.mapOptional("macros", keys->macros);
+diff --git a/llvm/projects/tapi/lib/Driver/DirectoryScanner.cpp b/llvm/projects/tapi/lib/Driver/DirectoryScanner.cpp
+index d85cbacc4a12..2aac9d57d2b9 100644
+--- a/llvm/projects/tapi/lib/Driver/DirectoryScanner.cpp
++++ b/llvm/projects/tapi/lib/Driver/DirectoryScanner.cpp
+@@ -21,9 +21,9 @@
+ #include "tapi/Core/Utils.h"
+ #include "tapi/Diagnostics/Diagnostics.h"
+ #include "clang/Basic/Diagnostic.h"
+-#include "clang/Basic/VirtualFileSystem.h"
+ #include "llvm/Support/Path.h"
+ #include "llvm/Support/raw_ostream.h"
++#include "llvm/Support/VirtualFileSystem.h"
+ 
+ using namespace llvm;
+ using namespace clang;
+@@ -53,11 +53,10 @@ bool DirectoryScanner::scanDylibDirectory(
+     sys::path::append(path, subDirectory);
+     return _fm.getDirectory(path, /*CacheFailure=*/false);
+   };
+-  const DirectoryEntry *directoryEntryPublic = getDirectory("usr/include");
+-  const DirectoryEntry *directoryEntryPrivate =
+-      getDirectory("usr/local/include");
++  auto directoryEntryPublicOrError = getDirectory("usr/include");
++  auto directoryEntryPrivateOrError = getDirectory("usr/local/include");
+ 
+-  if (!directoryEntryPublic && !directoryEntryPrivate) {
++  if (!directoryEntryPublicOrError && !directoryEntryPrivateOrError) {
+     errs() << "error: Cannot find public or private sub directories: "
+            << directory << "\n";
+   }
+@@ -66,13 +65,13 @@ bool DirectoryScanner::scanDylibDirectory(
+   auto &dylib = frameworks.back();
+   dylib.isDynamicLibrary = true;
+ 
+-  if (directoryEntryPublic) {
+-    if (!scanHeaders(dylib, directoryEntryPublic->getName(),
++  if (directoryEntryPublicOrError) {
++    if (!scanHeaders(dylib, directoryEntryPublicOrError.get()->getName(),
+                      HeaderType::Public))
+       return false;
+   }
+-  if (directoryEntryPrivate) {
+-    if (!scanHeaders(dylib, directoryEntryPrivate->getName(),
++  if (directoryEntryPrivateOrError) {
++    if (!scanHeaders(dylib, directoryEntryPrivateOrError.get()->getName(),
+                      HeaderType::Private))
+       return false;
+   }
+@@ -114,10 +113,10 @@ bool DirectoryScanner::scanDirectory(StringRef directory,
+ bool DirectoryScanner::scanFrameworksDirectory(
+     std::vector<Framework> &frameworks, StringRef directory) const {
+   std::error_code ec;
+-  auto &fs = *_fm.getVirtualFileSystem();
++  auto &fs = _fm.getVirtualFileSystem();
+   for (vfs::directory_iterator i = fs.dir_begin(directory, ec), ie; i != ie;
+        i.increment(ec)) {
+-    auto path = i->getName();
++    auto path = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+@@ -158,10 +157,10 @@ bool DirectoryScanner::scanFrameworkDirectory(Framework &framework) const {
+   // there is a Versions directory, then we have symlinks and directly proceed
+   // to the Versiosn folder.
+   std::error_code ec;
+-  auto &fs = *_fm.getVirtualFileSystem();
++  auto &fs = _fm.getVirtualFileSystem();
+   for (vfs::directory_iterator i = fs.dir_begin(framework.getPath(), ec), ie;
+        i != ie; i.increment(ec)) {
+-    auto path = i->getName();
++    auto path = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+@@ -232,10 +231,10 @@ bool DirectoryScanner::scanFrameworkDirectory(Framework &framework) const {
+ bool DirectoryScanner::scanHeaders(Framework &framework, StringRef path,
+                                    HeaderType type) const {
+   std::error_code ec;
+-  auto &fs = *_fm.getVirtualFileSystem();
++  auto &fs = _fm.getVirtualFileSystem();
+   for (vfs::recursive_directory_iterator i(fs, path, ec), ie; i != ie;
+        i.increment(ec)) {
+-    auto headerPath = i->getName();
++    auto headerPath = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+@@ -265,10 +264,10 @@ bool DirectoryScanner::scanHeaders(Framework &framework, StringRef path,
+ 
+ bool DirectoryScanner::scanModules(Framework &framework, StringRef path) const {
+   std::error_code ec;
+-  auto &fs = *_fm.getVirtualFileSystem();
++  auto &fs = _fm.getVirtualFileSystem();
+   for (vfs::recursive_directory_iterator i(fs, path, ec), ie; i != ie;
+        i.increment(ec)) {
+-    auto path = i->getName();
++    auto path = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+@@ -293,10 +292,10 @@ bool DirectoryScanner::scanModules(Framework &framework, StringRef path) const {
+ bool DirectoryScanner::scanFrameworkVersionsDirectory(Framework &framework,
+                                                       StringRef path) const {
+   std::error_code ec;
+-  auto &fs = *_fm.getVirtualFileSystem();
++  auto &fs = _fm.getVirtualFileSystem();
+   for (vfs::directory_iterator i = fs.dir_begin(path, ec), ie; i != ie;
+        i.increment(ec)) {
+-    auto path = i->getName();
++    auto path = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+@@ -327,10 +326,10 @@ bool DirectoryScanner::scanFrameworkVersionsDirectory(Framework &framework,
+ bool DirectoryScanner::scanLibraryDirectory(Framework &framework,
+                                             StringRef path) const {
+   std::error_code ec;
+-  auto &fs = *_fm.getVirtualFileSystem();
++  auto &fs = _fm.getVirtualFileSystem();
+   for (vfs::recursive_directory_iterator i(fs, path, ec), ie; i != ie;
+        i.increment(ec)) {
+-    auto path = i->getName();
++    auto path = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+@@ -456,10 +455,10 @@ bool DirectoryScanner::scanSDKContent(StringRef directory,
+ 
+   // Scan the bundles and extensions in /System/Library.
+   std::error_code ec;
+-  auto &fs = *_fm.getVirtualFileSystem();
++  auto &fs = _fm.getVirtualFileSystem();
+   for (auto i = fs.dir_begin(getDirectory("System/Library"), ec);
+        i != vfs::directory_iterator(); i.increment(ec)) {
+-    auto path = i->getName();
++    auto path = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+diff --git a/llvm/projects/tapi/lib/Driver/DriverUtils.cpp b/llvm/projects/tapi/lib/Driver/DriverUtils.cpp
+index 757915bde4d5..75c375d46f56 100644
+--- a/llvm/projects/tapi/lib/Driver/DriverUtils.cpp
++++ b/llvm/projects/tapi/lib/Driver/DriverUtils.cpp
+@@ -15,9 +15,9 @@
+ #include "tapi/Core/FileManager.h"
+ #include "tapi/Core/Utils.h"
+ #include "tapi/Diagnostics/Diagnostics.h"
+-#include "clang/Basic/VirtualFileSystem.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/Support/Path.h"
++#include "llvm/Support/VirtualFileSystem.h"
+ 
+ using namespace llvm;
+ using namespace clang;
+@@ -28,10 +28,10 @@ static void findAndAddHeaderFilesImpl(HeaderSeq &headersOut, FileManager &fm,
+                                       DiagnosticsEngine &diag, StringRef path,
+                                       HeaderType type) {
+   std::error_code ec;
+-  auto &fs = *fm.getVirtualFileSystem();
++  auto &fs = fm.getVirtualFileSystem();
+   for (vfs::directory_iterator i = fs.dir_begin(path, ec), ie; i != ie;
+        i.increment(ec)) {
+-    auto path = i->getName();
++    auto path = i->path();
+ 
+     // Skip files that not exist. This usually happens for broken symlinks.
+     if (ec == std::errc::no_such_file_or_directory) {
+diff --git a/llvm/projects/tapi/lib/Driver/HeaderGlob.cpp b/llvm/projects/tapi/lib/Driver/HeaderGlob.cpp
+index 2b11fbe17f73..7465089df25d 100644
+--- a/llvm/projects/tapi/lib/Driver/HeaderGlob.cpp
++++ b/llvm/projects/tapi/lib/Driver/HeaderGlob.cpp
+@@ -77,7 +77,7 @@ Expected<std::unique_ptr<HeaderGlob>> HeaderGlob::create(StringRef globString,
+   auto regex = Regex(regexString);
+   std::string error;
+   if (regex.isValid(error))
+-    return make_unique<HeaderGlob>(globString, std::move(regex), type);
++    return std::make_unique<HeaderGlob>(globString, std::move(regex), type);
+ 
+   return make_error<StringError>(error, inconvertibleErrorCode());
+ }
+diff --git a/llvm/projects/tapi/lib/Driver/InstallAPIDriver.cpp b/llvm/projects/tapi/lib/Driver/InstallAPIDriver.cpp
+index 8f5a3be70eac..8cc605132c11 100644
+--- a/llvm/projects/tapi/lib/Driver/InstallAPIDriver.cpp
++++ b/llvm/projects/tapi/lib/Driver/InstallAPIDriver.cpp
+@@ -357,10 +357,11 @@ getCodeCoverageSymbols(DiagnosticsEngine &diag,
+                                              /*STDOUT=*/llvm::None,
+                                              /*STDERR=*/StringRef(stderrFile)};
+ 
+-    bool failed = sys::ExecuteAndWait(clangBinary.get(), clangArgs,
+-                                      /*env=*/nullptr, redirects);
++    std::string *ErrMsg=nullptr;
++    bool *ExecutionFailed;
++    sys::ExecuteAndWait(clangBinary.get(), llvm::toStringRefArray(clangArgs), /*env=*/NoneType::None, redirects, 0, 0, ErrMsg, ExecutionFailed);
+ 
+-    if (failed) {
++    if (ExecutionFailed) {
+       auto bufferOr = MemoryBuffer::getFile(stderrFile);
+       if (auto ec = bufferOr.getError())
+         return make_error<StringError>("unable to read file", ec);
+@@ -498,7 +499,7 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+   FrontendJob job;
+   job.workingDirectory = globalSnapshot->getWorkingDirectory();
+   job.cacheFactory = newFileSystemStatCacheFactory<StatRecorder>();
+-  job.vfs = fm.getVirtualFileSystem();
++  job.vfs = &fm.getVirtualFileSystem();
+   job.language = opts.frontendOptions.language;
+   job.language_std = opts.frontendOptions.language_std;
+   job.useRTTI = opts.frontendOptions.useRTTI;
+@@ -522,11 +523,12 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+     return false;
+   }
+ 
+-  const FileEntry *jsonFile = nullptr;
++  const clang::FileEntry *jsonFile = nullptr;
++  //const FileEntry *jsonFile = nullptr;
+   for (const auto &path : opts.driverOptions.inputs) {
+     if (sys::path::extension(path) == ".json") {
+-      if (auto *file = fm.getFile(path)) {
+-        jsonFile = file;
++      if (auto file = fm.getFile(path)) {
++        jsonFile = file.get();
+         break;
+       }
+     }
+@@ -545,7 +547,7 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+     for (const auto &path : opts.driverOptions.inputs) {
+       if (fm.isDirectory(path, /*CacheFailure=*/false)) {
+         SmallString<PATH_MAX> normalizedPath(path);
+-        fm.getVirtualFileSystem()->makeAbsolute(normalizedPath);
++        fm.getVirtualFileSystem().makeAbsolute(normalizedPath);
+         sys::path::remove_dots(normalizedPath, /*remove_dot_dot=*/true);
+         if (!scanner.scan(normalizedPath, frameworks))
+           return false;
+@@ -578,7 +580,7 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+ 
+     frameworkName = sys::path::stem(framework->getName());
+     for (const auto &header : framework->_headerFiles) {
+-      auto *file = fm.getFile(header.fullPath);
++      auto file = fm.getFile(header.fullPath);
+       if (!file) {
+         if (header.type == HeaderType::Public)
+           diag.report(diag::err_no_such_public_header_file) << header.fullPath;
+@@ -598,7 +600,7 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+     }
+   } else {
+     Registry registry;
+-    auto reader = make_unique<YAMLReader>();
++    auto reader = std::make_unique<YAMLReader>();
+     reader->add(std::unique_ptr<DocumentHandler>(
+         new json_file::v1::YAMLDocumentHandler));
+     registry.add(std::move(reader));
+@@ -665,8 +667,8 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+         excludeHeaderGlobs.emplace_back(std::move(glob.get()));
+       else {
+         consumeError(glob.takeError());
+-        if (auto file = fm.getFile(str))
+-          excludeHeaderFiles.emplace(file);
++        if (auto fileOrErr = fm.getFile(str))
++          excludeHeaderFiles.emplace(fileOrErr.get());
+         else {
+           diag.report(diagID) << str;
+           return false;
+@@ -692,9 +694,13 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+ 
+   if (!excludeHeaderFiles.empty()) {
+     for (auto &header : headerFiles) {
+-      const auto *file = fm.getFile(header.fullPath);
+-      if (excludeHeaderFiles.count(file))
+-        header.isExcluded = true;
++      const auto fileOrError = fm.getFile(header.fullPath);
++      if (fileOrError) {
++          const auto file = fileOrError.get();
++
++          if (excludeHeaderFiles.count(file))
++              header.isExcluded = true;
++      }
+     }
+   }
+ 
+@@ -806,13 +812,13 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+     }
+   }
+ 
+-  auto headerSymbols = make_unique<XPISet>();
++  auto headerSymbols = std::make_unique<XPISet>();
+   for (auto &result : frontendResults) {
+     API2XPIConverter converter(headerSymbols.get(), result.target);
+     result.visit(converter);
+   }
+ 
+-  auto scanFile = make_unique<ExtendedInterfaceFile>(std::move(headerSymbols));
++  auto scanFile = std::make_unique<ExtendedInterfaceFile>(std::move(headerSymbols));
+ 
+   if (opts.tapiOptions.printAfter == "xpi")
+     scanFile->printSymbols(ArchitectureSet::All());
+@@ -911,7 +917,7 @@ bool Driver::InstallAPI::run(DiagnosticsEngine &diag, Options &opts) {
+     return false;
+   }
+ 
+-  auto interface = make_unique<InterfaceFile>(std::move(*scanFile.get()));
++  auto interface = std::make_unique<InterfaceFile>(std::move(*scanFile.get()));
+   auto result =
+       manager.writeFile(interface.get(), opts.driverOptions.outputPath);
+   if (result) {
+diff --git a/llvm/projects/tapi/lib/Driver/Options.cpp b/llvm/projects/tapi/lib/Driver/Options.cpp
+index 570349cf836e..d6c8c91beac1 100644
+--- a/llvm/projects/tapi/lib/Driver/Options.cpp
++++ b/llvm/projects/tapi/lib/Driver/Options.cpp
+@@ -18,13 +18,13 @@
+ #include "tapi/Driver/StatRecorder.h"
+ #include "tapi/LinkerInterfaceFile.h"
+ #include "clang/Basic/Version.inc"
+-#include "clang/Basic/VirtualFileSystem.h"
+ #include "clang/Config/config.h"
+ #include "llvm/ADT/ArrayRef.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/Option/ArgList.h"
+ #include "llvm/Option/OptSpecifier.h"
+ #include "llvm/Support/raw_ostream.h"
++#include "llvm/Support/VirtualFileSystem.h"
+ #include <string>
+ #include <utility>
+ 
+@@ -706,14 +706,14 @@ bool Options::processFrontendOptions(DiagnosticsEngine &diag,
+   // Handle language option.
+   if (auto *arg = args.getLastArg(OPT_x)) {
+     frontendOptions.language =
+-        StringSwitch<clang::InputKind::Language>(arg->getValue())
+-            .Case("c", clang::InputKind::C)
+-            .Case("c++", clang::InputKind::CXX)
+-            .Case("objective-c", clang::InputKind::ObjC)
+-            .Case("objective-c++", clang::InputKind::ObjCXX)
+-            .Default(clang::InputKind::Unknown);
+-
+-    if (frontendOptions.language == clang::InputKind::Unknown) {
++        StringSwitch<clang::Language>(arg->getValue())
++            .Case("c", clang::Language::C)
++            .Case("c++", clang::Language::CXX)
++            .Case("objective-c", clang::Language::ObjC)
++            .Case("objective-c++", clang::Language::ObjCXX)
++            .Default(clang::Language::Unknown);
++
++    if (frontendOptions.language == clang::Language::Unknown) {
+       diag.report(clang::diag::err_drv_invalid_value)
+           << arg->getAsString(args) << arg->getValue();
+       return false;
+@@ -723,9 +723,9 @@ bool Options::processFrontendOptions(DiagnosticsEngine &diag,
+   // Handle ObjC/ObjC++ switch.
+   for (auto *arg : args.filtered(OPT_ObjC, OPT_ObjCXX)) {
+     if (arg->getOption().matches(OPT_ObjC))
+-      frontendOptions.language = clang::InputKind::ObjC;
++      frontendOptions.language = clang::Language::ObjC;
+     else
+-      frontendOptions.language = clang::InputKind::ObjCXX;
++      frontendOptions.language = clang::Language::ObjCXX;
+   }
+ 
+   // Handle language std.
+@@ -983,7 +983,7 @@ static void updateClangResourceDirFiles(DiagnosticsEngine &diag,
+     SmallString<PATH_MAX> srcPath(header);
+ 
+     // Normalize path.
+-    if (fm.getVirtualFileSystem()->makeAbsolute(externalPath))
++    if (fm.getVirtualFileSystem().makeAbsolute(externalPath))
+       return;
+     sys::path::remove_dots(externalPath, /*remove_dot_dot=*/true);
+     sys::path::replace_path_prefix(srcPath, clangResourcePath,
+@@ -1052,7 +1052,7 @@ Options::Options(DiagnosticsEngine &diag, ArrayRef<const char *> argString) {
+       globalSnapshot->requestSnapshot();
+ 
+     globalSnapshot->setWorkingDirectory(
+-        fm->getVirtualFileSystem()->getCurrentWorkingDirectory().get());
++        fm->getVirtualFileSystem().getCurrentWorkingDirectory().get());
+   }
+ 
+   // This has to happen after processing the snapshot options, but before all
+diff --git a/llvm/projects/tapi/lib/Driver/ReexportDriver.cpp b/llvm/projects/tapi/lib/Driver/ReexportDriver.cpp
+index bb4ec7718d5f..2373c91af240 100644
+--- a/llvm/projects/tapi/lib/Driver/ReexportDriver.cpp
++++ b/llvm/projects/tapi/lib/Driver/ReexportDriver.cpp
+@@ -95,13 +95,13 @@ bool Driver::Reexport::run(DiagnosticsEngine &diag, Options &opts) {
+     frontendResults.emplace_back(std::move(result.getValue()));
+   }
+ 
+-  auto headerSymbols = make_unique<XPISet>();
++  auto headerSymbols = std::make_unique<XPISet>();
+   for (auto &result : frontendResults) {
+     API2XPIConverter converter(headerSymbols.get(), result.target);
+     result.visit(converter);
+   }
+ 
+-  auto scanFile = make_unique<ExtendedInterfaceFile>(std::move(headerSymbols));
++  auto scanFile = std::make_unique<ExtendedInterfaceFile>(std::move(headerSymbols));
+   scanFile->setFileType(FileType::ReexportFile);
+   scanFile->setArchitectures(
+       mapToArchitectureSet(opts.frontendOptions.targets));
+diff --git a/llvm/projects/tapi/lib/Driver/Snapshot.cpp b/llvm/projects/tapi/lib/Driver/Snapshot.cpp
+index ca3cc17dc780..f1fa8fd8c0d0 100644
+--- a/llvm/projects/tapi/lib/Driver/Snapshot.cpp
++++ b/llvm/projects/tapi/lib/Driver/Snapshot.cpp
+@@ -22,7 +22,6 @@
+ 
+ using namespace llvm;
+ using namespace TAPI_INTERNAL;
+-using clang::InputKind;
+ 
+ using Mapping = std::pair<std::string, uint64_t>;
+ using Reexports = std::pair<std::string, ArchitectureSet>;
+@@ -125,7 +124,7 @@ template <> struct MappingTraits<DriverOptions> {
+   static void mapping(IO &io, DriverOptions &opts) {
+     io.mapOptional("print-version", opts.printVersion, false);
+     io.mapOptional("print-help", opts.printHelp, false);
+-    io.mapOptional("inputs", opts.inputs, {});
++    io.mapOptional("inputs", opts.inputs, (PathSeq){});
+     io.mapOptional("output-path", opts.outputPath, std::string());
+   }
+ };
+@@ -147,11 +146,11 @@ struct MappingContextTraits<LinkerOptions, Snapshot::MappingContext> {
+     io.mapOptional("compatibility-version", opts.compatibilityVersion,
+                    PackedVersion());
+     io.mapOptional("is-dynamic-library", opts.isDynamicLibrary, false);
+-    io.mapOptional("allowable-clients", opts.allowableClients, {});
+-    io.mapOptional("reexported-libraries", opts.reexportInstallNames, {});
+-    io.mapOptional("reexported-libraries2", opts.reexportedLibraries, {});
+-    io.mapOptional("reexported-library-paths", opts.reexportedLibraryPaths, {});
+-    io.mapOptional("reexported-frameworks", opts.reexportedFrameworks, {});
++    io.mapOptional("allowable-clients", opts.allowableClients, (__typeof__(opts.allowableClients)){});
++    io.mapOptional("reexported-libraries", opts.reexportInstallNames, (__typeof__(opts.reexportInstallNames)){});
++    io.mapOptional("reexported-libraries2", opts.reexportedLibraries, (__typeof__(opts.reexportedLibraries)){});
++    io.mapOptional("reexported-library-paths", opts.reexportedLibraryPaths, (__typeof__(opts.reexportedLibraryPaths)){});
++    io.mapOptional("reexported-frameworks", opts.reexportedFrameworks, (__typeof__(opts.reexportedFrameworks)){});
+     io.mapOptional("is-application-extension-safe",
+                    opts.isApplicationExtensionSafe, false);
+   }
+@@ -164,17 +163,17 @@ struct MappingContextTraits<tapi::internal::FrontendOptions,
+                       Snapshot::MappingContext &ctx) {
+     io.mapOptional("platform", ctx.platform, Platform::unknown);
+     io.mapOptional("os-version", ctx.osVersion, std::string());
+-    io.mapOptional("targets", opts.targets, {});
+-    io.mapOptional("language", opts.language, InputKind::ObjC);
++    io.mapOptional("targets", opts.targets, (__typeof__(opts.targets)){});
++    io.mapOptional("language", opts.language, clang::Language::ObjC);
+     io.mapOptional("language-std", opts.language_std, std::string());
+     io.mapOptional("isysroot", opts.isysroot, std::string());
+     io.mapOptional("umbrella", opts.umbrella, std::string());
+-    io.mapOptional("system-framework-paths", opts.systemFrameworkPaths, {});
+-    io.mapOptional("system-include-paths", opts.systemIncludePaths, {});
+-    io.mapOptional("framework-paths", opts.frameworkPaths, {});
+-    io.mapOptional("library-paths", opts.libraryPaths, {});
+-    io.mapOptional("include-paths", opts.includePaths, {});
+-    io.mapOptional("macros", opts.macros, {});
++    io.mapOptional("system-framework-paths", opts.systemFrameworkPaths, (__typeof__(opts.systemFrameworkPaths)){});
++    io.mapOptional("system-include-paths", opts.systemIncludePaths, (__typeof__(opts.systemIncludePaths)){});
++    io.mapOptional("framework-paths", opts.frameworkPaths, (__typeof__(opts.frameworkPaths)){});
++    io.mapOptional("library-paths", opts.libraryPaths, (__typeof__(opts.libraryPaths)){});
++    io.mapOptional("include-paths", opts.includePaths, (__typeof__(opts.includePaths)){});
++    io.mapOptional("macros", opts.macros, (__typeof__(opts.macros)){});
+     io.mapOptional("use-rtti", opts.useRTTI, true);
+     io.mapOptional("visibility", opts.visibility, std::string());
+     io.mapOptional("enable-modules", opts.enableModules, false);
+@@ -183,7 +182,7 @@ struct MappingContextTraits<tapi::internal::FrontendOptions,
+                    false);
+     io.mapOptional("use-objc-arc", opts.useObjectiveCARC, false);
+     io.mapOptional("use-objc-weak", opts.useObjectiveCWeakARC, false);
+-    io.mapOptional("clang-extra-args", opts.clangExtraArgs, {});
++    io.mapOptional("clang-extra-args", opts.clangExtraArgs, (__typeof__(opts.clangExtraArgs)){});
+     io.mapOptional("clang-resource-path", opts.clangResourcePath,
+                    std::string());
+   }
+@@ -205,10 +204,10 @@ template <> struct MappingTraits<TAPIOptions> {
+                    std::string());
+     io.mapOptional("private-umbrella-header-path",
+                    opts.privateUmbrellaHeaderPath, std::string());
+-    io.mapOptional("extra-public-headers", opts.extraPublicHeaders, {});
+-    io.mapOptional("extra-private-headers", opts.extraPrivateHeaders, {});
+-    io.mapOptional("exclude-public-headers", opts.excludePublicHeaders, {});
+-    io.mapOptional("exclude-private-headers", opts.excludePrivateHeaders, {});
++    io.mapOptional("extra-public-headers", opts.extraPublicHeaders, (__typeof__(opts.extraPublicHeaders)){});
++    io.mapOptional("extra-private-headers", opts.extraPrivateHeaders, (__typeof__(opts.extraPrivateHeaders)){});
++    io.mapOptional("exclude-public-headers", opts.excludePublicHeaders, (__typeof__(opts.excludePublicHeaders)){});
++    io.mapOptional("exclude-private-headers", opts.excludePrivateHeaders, (__typeof__(opts.excludePrivateHeaders)){});
+     io.mapOptional("verify-against", opts.verifyAgainst, std::string());
+     io.mapOptional("verification-mode", opts.verificationMode,
+                    VerificationMode::ErrorsOnly);
+diff --git a/llvm/projects/tapi/lib/Driver/SnapshotFileSystem.cpp b/llvm/projects/tapi/lib/Driver/SnapshotFileSystem.cpp
+index c27a6247f692..cdbcbc874c11 100644
+--- a/llvm/projects/tapi/lib/Driver/SnapshotFileSystem.cpp
++++ b/llvm/projects/tapi/lib/Driver/SnapshotFileSystem.cpp
+@@ -79,7 +79,7 @@ ErrorOr<Status> SnapshotFileSystem::status(const Twine &path, Entry *entry) {
+     return status;
+   } // directory
+   auto *directory = cast<DirectoryEntry>(entry);
+-  return Status::copyWithNewName(directory->getStatus(), path.str());
++  return Status::copyWithNewName(directory->getStatus(), path);
+ }
+ 
+ ErrorOr<Status> SnapshotFileSystem::status(const Twine &path) {
+@@ -125,7 +125,7 @@ class FileWithFixedStatus : public File {
+ };
+ } // end anonymous namespace
+ 
+-ErrorOr<std::unique_ptr<clang::vfs::File>>
++ErrorOr<std::unique_ptr<llvm::vfs::File>>
+ SnapshotFileSystem::openFileForRead(const Twine &path) {
+   auto result = lookupPath(path);
+   if (auto ec = result.getError())
+@@ -145,10 +145,10 @@ SnapshotFileSystem::openFileForRead(const Twine &path) {
+ 
+   auto status = getFileStatus(path, *externalStatus);
+   return std::unique_ptr<File>(
+-      make_unique<FileWithFixedStatus>(std::move(*result2), status));
++      std::make_unique<FileWithFixedStatus>(std::move(*result2), status));
+ }
+ 
+-class SnapshotDirIterImpl : public clang::vfs::detail::DirIterImpl {
++class SnapshotDirIterImpl : public llvm::vfs::detail::DirIterImpl {
+   std::string dir;
+   SnapshotFileSystem &fs;
+   SnapshotFileSystem::DirectoryEntry::iterator current, end;
+@@ -169,13 +169,29 @@ class SnapshotDirIterImpl : public clang::vfs::detail::DirIterImpl {
+     if ((ec = result.getError()))
+       return;
+ 
+-    CurrentEntry = *result;
++    sys::fs::file_type Type;
++    switch ((*current)->getKind()) {
++        case SnapshotFileSystem::EntryKind::Directory:
++            Type = sys::fs::file_type::directory_file;
++            break;
++        case SnapshotFileSystem::EntryKind::File:
++            Type = sys::fs::file_type::regular_file;
++            break;
++    }
++
++    CurrentEntry = llvm::vfs::directory_entry(path.str(), Type);
+   }
+ 
+   std::error_code increment() override {
++    sys::fs::file_type Type;
+     if (++current == end) {
+-      CurrentEntry = Status();
+-      return {};
++        if (Status().isDirectory())
++            Type = sys::fs::file_type::directory_file;
++        else
++            Type = sys::fs::file_type::regular_file;
++
++        CurrentEntry = llvm::vfs::directory_entry(Status().getName().str(), Type);
++        return {};
+     }
+ 
+     SmallString<PATH_MAX> path(dir);
+@@ -184,7 +200,16 @@ class SnapshotDirIterImpl : public clang::vfs::detail::DirIterImpl {
+     if (auto ec = result.getError())
+       return ec;
+ 
+-    CurrentEntry = *result;
++    switch ((*current)->getKind()) {
++        case SnapshotFileSystem::EntryKind::Directory:
++            Type = sys::fs::file_type::directory_file;
++            break;
++        case SnapshotFileSystem::EntryKind::File:
++            Type = sys::fs::file_type::regular_file;
++            break;
++    }
++
++    CurrentEntry = llvm::vfs::directory_entry(path.str(), Type);
+     return {};
+   }
+ };
+@@ -236,7 +261,7 @@ SnapshotFileSystem::addFile(StringRef path, StringRef externalPath) {
+   if (auto ec = directory.getError())
+     return ec;
+   return cast<FileEntry>(directory.get()->addContent(
+-      make_unique<FileEntry>(filename, externalPath)));
++      std::make_unique<FileEntry>(filename, externalPath)));
+ }
+ 
+ ErrorOr<SnapshotFileSystem::DirectoryEntry *>
+@@ -252,7 +277,7 @@ SnapshotFileSystem::lookupOrCreate(StringRef name, DirectoryEntry *current) {
+       return cast<DirectoryEntry>(entry.get());
+   }
+   return cast<DirectoryEntry>(
+-      current->addContent(make_unique<DirectoryEntry>(name)));
++      current->addContent(std::make_unique<DirectoryEntry>(name)));
+ }
+ 
+ ErrorOr<SnapshotFileSystem::DirectoryEntry *>
+diff --git a/llvm/projects/tapi/lib/Driver/StubDriver.cpp b/llvm/projects/tapi/lib/Driver/StubDriver.cpp
+index 9349c4825043..8ec91b15c025 100644
+--- a/llvm/projects/tapi/lib/Driver/StubDriver.cpp
++++ b/llvm/projects/tapi/lib/Driver/StubDriver.cpp
+@@ -142,7 +142,7 @@ static bool inlineFrameworks(Context &ctx, InterfaceFile *dylib) {
+     std::shared_ptr<InterfaceFile> reexportedDylib;
+     auto *file2 = file.get().release();
+     if (auto *extended = dyn_cast<ExtendedInterfaceFile>(file2))
+-      reexportedDylib = make_unique<InterfaceFile>(std::move(*extended));
++      reexportedDylib = std::make_unique<InterfaceFile>(std::move(*extended));
+     else
+       reexportedDylib =
+           std::unique_ptr<InterfaceFile>(cast<InterfaceFile>(file2));
+@@ -232,11 +232,13 @@ static bool inlineFrameworks(Context &ctx, InterfaceFile *dylib) {
+ }
+ 
+ static bool stubifyDynamicLibrary(Context &ctx) {
+-  const auto *inputFile = ctx.fm.getFile(ctx.inputPath);
+-  if (!inputFile) {
+-    ctx.diag.report(clang::diag::err_drv_no_such_file) << ctx.inputPath;
++  const auto inputFileOrErr = ctx.fm.getFile(ctx.inputPath);
++  if (auto ec = inputFileOrErr.getError()) {
++    ctx.diag.report(clang::diag::err_drv_no_such_file)
++        << ctx.inputPath << ec.message();;
+     return false;
+   }
++  const auto *inputFile = inputFileOrErr.get();
+   auto bufferOrErr = ctx.fm.getBufferForFile(inputFile);
+   if (auto ec = bufferOrErr.getError()) {
+     ctx.diag.report(diag::err_cannot_read_file)
+@@ -264,7 +266,7 @@ static bool stubifyDynamicLibrary(Context &ctx) {
+   std::unique_ptr<InterfaceFile> interface;
+   auto *file2 = file.get().release();
+   if (auto *extended = dyn_cast<ExtendedInterfaceFile>(file2))
+-    interface = make_unique<InterfaceFile>(std::move(*extended));
++    interface = std::make_unique<InterfaceFile>(std::move(*extended));
+   else
+     interface = std::unique_ptr<InterfaceFile>(cast<InterfaceFile>(file2));
+ 
+@@ -422,9 +424,10 @@ static bool stubifyDirectory(Context &ctx) {
+     }
+ 
+     // We only have to look at files.
+-    auto *file = ctx.fm.getFile(path);
+-    if (!file)
++    auto fileOrErr = ctx.fm.getFile(path);
++    if (!fileOrErr)
+       continue;
++    auto *file = fileOrErr.get();
+ 
+     if (ctx.deletePrivateFrameworks &&
+         isPrivatePath(path.drop_front(ctx.inputPath.size()))) {
+@@ -458,7 +461,7 @@ static bool stubifyDirectory(Context &ctx) {
+     std::unique_ptr<InterfaceFile> interface;
+     auto *file3 = file2.get().release();
+     if (auto *extended = dyn_cast<ExtendedInterfaceFile>(file3))
+-      interface = make_unique<InterfaceFile>(std::move(*extended));
++      interface = std::make_unique<InterfaceFile>(std::move(*extended));
+     else
+       interface = std::unique_ptr<InterfaceFile>(cast<InterfaceFile>(file3));
+ 
+diff --git a/llvm/projects/tapi/lib/Frontend/APIVisitor.h b/llvm/projects/tapi/lib/Frontend/APIVisitor.h
+index 63ad21464589..0b72c5881730 100644
+--- a/llvm/projects/tapi/lib/Frontend/APIVisitor.h
++++ b/llvm/projects/tapi/lib/Frontend/APIVisitor.h
+@@ -96,7 +96,7 @@ class APIVisitorAction : public ASTFrontendAction {
+     context.ast = &compiler.getASTContext();
+     context.sourceMgr = &compiler.getSourceManager();
+     context.pp = compiler.getPreprocessorPtr();
+-    return llvm::make_unique<APIVisitor>(context);
++    return std::make_unique<APIVisitor>(context);
+   }
+ 
+   FrontendContext &context;
+diff --git a/llvm/projects/tapi/lib/Frontend/Frontend.cpp b/llvm/projects/tapi/lib/Frontend/Frontend.cpp
+index d546bd8bb370..2240825d153b 100644
+--- a/llvm/projects/tapi/lib/Frontend/Frontend.cpp
++++ b/llvm/projects/tapi/lib/Frontend/Frontend.cpp
+@@ -35,32 +35,32 @@ using namespace clang;
+ 
+ TAPI_NAMESPACE_INTERNAL_BEGIN
+ 
+-static StringRef getLanguageOptions(clang::InputKind::Language lang) {
++static StringRef getLanguageOptions(clang::Language lang) {
+   switch (lang) {
+   default:
+     return "";
+-  case clang::InputKind::C:
++  case clang::Language::C:
+     return "-xc";
+-  case clang::InputKind::CXX:
++  case clang::Language::CXX:
+     return "-xc++";
+-  case clang::InputKind::ObjC:
++  case clang::Language::ObjC:
+     return "-xobjective-c";
+-  case clang::InputKind::ObjCXX:
++  case clang::Language::ObjCXX:
+     return "-xobjective-c++";
+   }
+ }
+ 
+-static StringRef getFileExtension(clang::InputKind::Language lang) {
++static StringRef getFileExtension(clang::Language lang) {
+   switch (lang) {
+   default:
+     llvm_unreachable("Unexpected language option.");
+-  case clang::InputKind::C:
++  case clang::Language::C:
+     return ".c";
+-  case clang::InputKind::CXX:
++  case clang::Language::CXX:
+     return ".cpp";
+-  case clang::InputKind::ObjC:
++  case clang::Language::ObjC:
+     return ".m";
+-  case clang::InputKind::ObjCXX:
++  case clang::Language::ObjCXX:
+     return ".mm";
+   }
+ }
+@@ -72,7 +72,7 @@ static SmallVectorImpl<char> &operator+=(SmallVectorImpl<char> &includes,
+ }
+ 
+ static void addHeaderInclude(StringRef headerName,
+-                             clang::InputKind::Language lang,
++                             clang::Language lang,
+                              SmallVectorImpl<char> &includes) {
+   SmallString<PATH_MAX> name;
+   if (!(headerName.startswith("\"") && headerName.endswith("\"")) &&
+@@ -83,7 +83,7 @@ static void addHeaderInclude(StringRef headerName,
+   } else
+     name += headerName;
+ 
+-  if (lang == clang::InputKind::C || lang == clang::InputKind::CXX)
++  if (lang == clang::Language::C || lang == clang::Language::CXX)
+     includes += "#include ";
+   else
+     includes += "#import ";
+@@ -118,9 +118,7 @@ CompilerInvocation *newInvocation(DiagnosticsEngine *diagnostics,
+                                   const opt::ArgStringList &cc1Args) {
+   assert(!cc1Args.empty() && "Must at least contain the program name!");
+   CompilerInvocation *invocation = new CompilerInvocation;
+-  CompilerInvocation::CreateFromArgs(*invocation, cc1Args.data() + 1,
+-                                     cc1Args.data() + cc1Args.size(),
+-                                     *diagnostics);
++  CompilerInvocation::CreateFromArgs(*invocation, cc1Args, *diagnostics);
+   invocation->getFrontendOpts().DisableFree = false;
+   invocation->getCodeGenOpts().DisableFree = false;
+   return invocation;
+@@ -128,10 +126,10 @@ CompilerInvocation *newInvocation(DiagnosticsEngine *diagnostics,
+ 
+ static bool runClang(FrontendContext &context, ArrayRef<std::string> options,
+                      std::unique_ptr<llvm::MemoryBuffer> input) {
+-  context.compiler = make_unique<CompilerInstance>();
++  context.compiler = std::make_unique<CompilerInstance>();
+   IntrusiveRefCntPtr<DiagnosticIDs> diagID(new DiagnosticIDs());
+   IntrusiveRefCntPtr<DiagnosticOptions> diagOpts(new DiagnosticOptions());
+-  std::unique_ptr<llvm::opt::OptTable> opts = driver::createDriverOptTable();
++  const llvm::opt::OptTable *opts = &driver::getDriverOptTable();
+ 
+   std::vector<const char *> argv;
+   for (const std::string &str : options)
+@@ -146,9 +144,10 @@ static bool runClang(FrontendContext &context, ArrayRef<std::string> options,
+   DiagnosticsEngine diagnosticsEngine(diagID, &*diagOpts, &diagnosticPrinter,
+                                       false);
+ 
++  IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS(&(context.fileManager->getVirtualFileSystem()));
+   const std::unique_ptr<clang::driver::Driver> driver(new clang::driver::Driver(
+       binaryName, llvm::sys::getDefaultTargetTriple(), diagnosticsEngine,
+-      context.fileManager->getVirtualFileSystem()));
++      VFS));
+   driver->setTitle("tapi");
+   // Since the input might only be virtual, don't check whether it exists.
+   driver->setCheckInputsExist(false);
+@@ -178,7 +177,7 @@ static bool runClang(FrontendContext &context, ArrayRef<std::string> options,
+   // Create a compiler instance to handle the actual work.
+   context.compiler->setInvocation(std::move(invocation));
+   context.compiler->setFileManager(&*(context.fileManager));
+-  auto action = make_unique<APIVisitorAction>(context);
++  auto action = std::make_unique<APIVisitorAction>(context);
+ 
+   // Create the compiler's actual diagnostics engine.
+   context.compiler->createDiagnostics();
+@@ -210,8 +209,11 @@ extern Optional<FrontendContext> runFrontend(const FrontendJob &job,
+                                                   : header.includeName,
+                        job.language, headerContents);
+ 
+-      const auto *file = context.fileManager->getFile(header.fullPath);
+-      context.files.emplace(file, header.type);
++      auto fileOrError = context.fileManager->getFile(header.fullPath);
++      if (fileOrError) {
++          const auto *file = fileOrError.get();
++          context.files.emplace(file, header.type);
++      }
+     }
+ 
+     inputFilePath =
+@@ -219,8 +221,11 @@ extern Optional<FrontendContext> runFrontend(const FrontendJob &job,
+     input = llvm::MemoryBuffer::getMemBufferCopy(headerContents, inputFilePath);
+   } else {
+     inputFilePath = inputFilename;
+-    const auto *file = context.fileManager->getFile(inputFilename);
+-    context.files.emplace(file, HeaderType::Public);
++    auto fileOrErr = context.fileManager->getFile(inputFilename);
++    if (fileOrErr) {
++        const auto *file = fileOrErr.get();
++        context.files.emplace(file, HeaderType::Public);
++    }
+   }
+ 
+   std::vector<std::string> args;
+@@ -300,8 +305,8 @@ extern Optional<FrontendContext> runFrontend(const FrontendJob &job,
+   }
+ 
+   // For c++ and objective-c++, add default stdlib to be libc++.
+-  if (job.language == clang::InputKind::CXX ||
+-      job.language == clang::InputKind::ObjCXX)
++  if (job.language == clang::Language::CXX ||
++      job.language == clang::Language::ObjCXX)
+     args.emplace_back("-stdlib=libc++");
+ 
+   // Add extra clang arguments.
+diff --git a/llvm/projects/tapi/lib/Frontend/FrontendContext.cpp b/llvm/projects/tapi/lib/Frontend/FrontendContext.cpp
+index f1629672cd43..c3e830215a21 100644
+--- a/llvm/projects/tapi/lib/Frontend/FrontendContext.cpp
++++ b/llvm/projects/tapi/lib/Frontend/FrontendContext.cpp
+@@ -19,7 +19,7 @@ TAPI_NAMESPACE_INTERNAL_BEGIN
+ FrontendContext::FrontendContext(
+     StringRef workingDirectory,
+     IntrusiveRefCntPtr<FileSystemStatCacheFactory> cacheFactory,
+-    IntrusiveRefCntPtr<clang::vfs::FileSystem> vfs) {
++    IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
+   fileManager = new FileManager(clang::FileSystemOptions{workingDirectory},
+                                 cacheFactory, vfs);
+ }
+diff --git a/llvm/projects/tapi/tools/CMakeLists.txt b/llvm/projects/tapi/tools/CMakeLists.txt
+index 9178ed84850e..d51f79556894 100644
+--- a/llvm/projects/tapi/tools/CMakeLists.txt
++++ b/llvm/projects/tapi/tools/CMakeLists.txt
+@@ -1,4 +1,4 @@
+ add_subdirectory(libtapi)
+ add_subdirectory(tapi)
+-add_subdirectory(tapi-run)
++#add_subdirectory(tapi-run)
+ add_subdirectory(tapi-frontend)
+diff --git a/llvm/projects/tapi/tools/libtapi/CMakeLists.txt b/llvm/projects/tapi/tools/libtapi/CMakeLists.txt
+index ea7a24795b1d..a948dc0b89c4 100644
+--- a/llvm/projects/tapi/tools/libtapi/CMakeLists.txt
++++ b/llvm/projects/tapi/tools/libtapi/CMakeLists.txt
+@@ -20,10 +20,12 @@ set_target_properties(libtapi
+   OUTPUT_NAME "tapi"
+   )
+ 
++if(APPLE)
++
+ set(DYLIB_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH}")
+ set_property(TARGET libtapi APPEND_STRING
+   PROPERTY
+-  LINK_FLAGS " -current_version ${DYLIB_VERSION} -compatibility_version 1 -allowable_client ld"
++  LINK_FLAGS " -current_version ${DYLIB_VERSION} -compatibility_version 1 " #-allowable_client ld"
+   )
+ 
+ if(LINKER_SUPPORTS_NO_INITS)
+@@ -32,3 +34,6 @@ if(LINKER_SUPPORTS_NO_INITS)
+     LINK_FLAGS " -Wl,-no_inits"
+     )
+ endif()
++
++endif()
++
+diff --git a/llvm/projects/tapi/tools/libtapi/LinkerInterfaceFile.cpp b/llvm/projects/tapi/tools/libtapi/LinkerInterfaceFile.cpp
+index b6789990e239..e4952df50268 100644
+--- a/llvm/projects/tapi/tools/libtapi/LinkerInterfaceFile.cpp
++++ b/llvm/projects/tapi/tools/libtapi/LinkerInterfaceFile.cpp
+@@ -298,6 +298,10 @@ static tapi::Platform mapPlatform(tapi::internal::Platform platform) {
+     return Platform::tvOS;
+   case tapi::internal::Platform::bridgeOS:
+     return Platform::bridgeOS;
++  case tapi::internal::Platform::iOSMac:
++    return Platform::iOSMac;
++  case tapi::internal::Platform::zippered:
++    return Platform::zippered;
+   }
+ }
+ 
+diff --git a/llvm/projects/tapi/tools/libtapi/libtapi.cpp b/llvm/projects/tapi/tools/libtapi/libtapi.cpp
+index b3e6e9b598f5..8b92a771f7e7 100644
+--- a/llvm/projects/tapi/tools/libtapi/libtapi.cpp
++++ b/llvm/projects/tapi/tools/libtapi/libtapi.cpp
+@@ -47,12 +47,16 @@ void llvm_unreachable_internal(const char *, const char *, unsigned) {
+ 
+ namespace sys {
+ 
++#ifdef __APPLE__
++
+ bool RemoveFileOnSignal(StringRef Filename, std::string *ErrMsg) { abort(); }
+ 
+ void DontRemoveFileOnSignal(StringRef Filename) { abort(); }
+ 
+ void AddSignalHandler(void (*)(void *), void *) { abort(); }
+ 
++#endif
++
+ } // end namespace sys.
+ 
+ } // end namespace llvm.
+diff --git a/llvm/projects/tapi/tools/tapi/CMakeLists.txt b/llvm/projects/tapi/tools/tapi/CMakeLists.txt
+index 025107e87956..8bc8afcaaf29 100644
+--- a/llvm/projects/tapi/tools/tapi/CMakeLists.txt
++++ b/llvm/projects/tapi/tools/tapi/CMakeLists.txt
+@@ -15,7 +15,7 @@ add_tapi_executable(tapi
+   tapi.cpp
+   )
+ 
+-target_link_libraries(tapi
++target_link_libraries(tapi PRIVATE
+   tapiDriver
+   )
+ 

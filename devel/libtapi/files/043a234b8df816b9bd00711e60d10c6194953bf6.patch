@@ -1,0 +1,51 @@
+From 043a234b8df816b9bd00711e60d10c6194953bf6 Mon Sep 17 00:00:00 2001
+From: Sam Bingner <sam@bingner.com>
+Date: Mon, 6 Jan 2020 15:54:32 -1000
+Subject: [PATCH] Revert "Remove `FileManager::invalidateCache` as it has no
+ callers anymore. NFC."
+
+This reverts commit 0785f8d0bb70b1485573556d1315784ebd085af3.
+---
+ clang/include/clang/Basic/FileManager.h |  3 +++
+ clang/lib/Basic/FileManager.cpp         | 14 ++++++++++++++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/clang/include/clang/Basic/FileManager.h b/clang/include/clang/Basic/FileManager.h
+index 28cd05818087..1586381f2d0e 100644
+--- a/clang/include/clang/Basic/FileManager.h
++++ b/clang/include/clang/Basic/FileManager.h
+@@ -398,6 +398,9 @@ class FileManager : public RefCountedBase<FileManager> {
+   std::error_code getNoncachedStatValue(StringRef Path,
+                                         llvm::vfs::Status &Result);
+ 
++  /// Remove the real file \p Entry from the cache.
++  void invalidateCache(const FileEntry *Entry);
++
+   /// If path is not absolute and FileSystemOptions set the working
+   /// directory, the path is modified to be relative to the given
+   /// working directory.
+diff --git a/clang/lib/Basic/FileManager.cpp b/clang/lib/Basic/FileManager.cpp
+index 88a7a1250837..f6e1b176e6da 100644
+--- a/clang/lib/Basic/FileManager.cpp
++++ b/clang/lib/Basic/FileManager.cpp
+@@ -522,6 +522,20 @@ FileManager::getNoncachedStatValue(StringRef Path,
+   return std::error_code();
+ }
+ 
++void FileManager::invalidateCache(const FileEntry *Entry) {
++  assert(Entry && "Cannot invalidate a NULL FileEntry");
++
++  SeenFileEntries.erase(Entry->getName());
++
++  // FileEntry invalidation should not block future optimizations in the file
++  // caches. Possible alternatives are cache truncation (invalidate last N) or
++  // invalidation of the whole cache.
++  //
++  // FIXME: This is broken. We sometimes have the same FileEntry* shared
++  // between multiple SeenFileEntries, so this can leave dangling pointers.
++  UniqueRealFiles.erase(Entry->getUniqueID());
++}
++
+ void FileManager::GetUniqueIDMapping(
+                    SmallVectorImpl<const FileEntry *> &UIDToFiles) const {
+   UIDToFiles.clear();
