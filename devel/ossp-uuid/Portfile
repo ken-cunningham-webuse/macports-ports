@@ -39,14 +39,24 @@ configure.args          --without-perl \
                         --without-pgsql \
                         --includedir=${prefix}/include/ossp
 
+# replace old config.{guess,sub} with recent versions from automake
+depends_build-append    port:automake
+post-patch {
+    set automake_dirs [glob -directory ${prefix}/share automake-*]
+    set automake_dir [lindex [lsort -command vercmp $automake_dirs] end]
+    copy -force ${automake_dir}/config.guess ${automake_dir}/config.sub \
+        ${worksrcpath}
+}
 
 if {[variant_isset universal]} {
     if { ${os.arch} eq "i386" } {
         if { ${os.major} >= 10 } {
             set merger_configure_env(ppc) ac_cv_va_copy=yes
+            set merger_configure_env(arm64) ac_cv_va_copy=yes
         }
         set merger_configure_env(ppc64)   ac_cv_va_copy=yes
     } else {
+        set merger_configure_env(arm64)    ac_cv_va_copy=yes
         set merger_configure_env(i386)    ac_cv_va_copy=yes
         set merger_configure_env(x86_64)  ac_cv_va_copy=yes
     }
