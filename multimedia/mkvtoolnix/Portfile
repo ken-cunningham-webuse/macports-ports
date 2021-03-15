@@ -37,7 +37,7 @@ livecheck.regex ${name}-(\[0-9.\]+)${extract.suffix}
 if {${os.platform} eq "darwin" && ${os.major} < 19} {
     # requires a newer libc++ than the system can provide
     depends_lib-append        port:macports-libcxx
-    configure.cppflags-append -D_LIBCPP_DISABLE_AVAILABILITY
+#    configure.cppflags-append -D_LIBCPP_DISABLE_AVAILABILITY
     configure.cxxflags-append  -nostdinc++ -I${prefix}/include/libcxx/v1
     configure.ldflags-append  -L${prefix}/lib/libcxx
     compiler.blacklist-append {clang < 1100} {macports-clang-3.[3-9]} {macports-clang-[5-8].0}
