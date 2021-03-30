@@ -10,7 +10,7 @@ epoch               5
 name                gcc10
 version             10.2.0
 revision            5
-subport             libgcc10 { revision 3 }
+subport             libgcc10 { revision 4 }
 platforms           darwin
 categories          lang
 maintainers         nomaintainer
@@ -60,6 +60,9 @@ if { ${os.major} > 19 } {
     # https://trac.macports.org/ticket/61494
     patchfiles-append         fix-sanitisers-darwin20.diff
 }
+
+# https://trac.macports.org/ticket/59616
+patchfiles-append   patch-libgcc10-libgfortran-environ.diff
 
 depends_lib         port:cctools \
                     port:gmp \

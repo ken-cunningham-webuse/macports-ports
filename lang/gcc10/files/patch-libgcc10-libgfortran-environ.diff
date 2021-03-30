@@ -1,0 +1,15 @@
+--- libgfortran/intrinsics/execute_command_line.c.orig	2021-03-28 17:21:22.000000000 -0700
++++ libgfortran/intrinsics/execute_command_line.c	2021-03-28 17:21:55.000000000 -0700
+@@ -34,7 +34,12 @@
+ #endif
+ #ifdef HAVE_POSIX_SPAWN
+ #include <spawn.h>
++# ifdef __APPLE__
++#  include <crt_externs.h>
++#  define environ (*_NSGetEnviron ())
++# else
+ extern char **environ;
++# endif
+ #endif
+ #if defined(HAVE_POSIX_SPAWN) || defined(HAVE_FORK)
+ #include <signal.h>
