@@ -7,7 +7,6 @@ PortGroup active_variants 1.1
 PortGroup cmake         1.0
 
 set llvm_version        5.0
-set llvm_version_no_dot 50
 set clang_executable_version 5.0
 set lldb_executable_version 5.0.2
 name                    llvm-${llvm_version}
@@ -317,10 +316,10 @@ if {[lsearch -exact $PortInfo(depends_build) port:cctools] != -1} {
 
 # use the system python27 if present
 if {${os.platform} eq "darwin" && ${os.major} >= 11} {
-	set pythonfullpath   /usr/bin/python2.7
+    set pythonfullpath   /usr/bin/python2.7
 } else {
-	set pythonfullpath   ${prefix}/bin/python2.7
-	depends_lib-append   port:python27
+    set pythonfullpath   ${prefix}/bin/python2.7
+    depends_lib-append   port:python27
 }
 configure.args-append   -DPYTHON_EXECUTABLE=${pythonfullpath}
 
@@ -400,46 +399,18 @@ if {${subport} eq "lldb-${llvm_version}"} {
 }
 
 post-extract {
-    # Get HTTP proxy arguments if required, assuming we can use the same proxy for all repositories
-    set proxy_args [portfetch::svn_proxy_args https://llvm.org/svn/llvm-project/cfe/trunk]
     if {${subport} eq "llvm-${llvm_version}"} {
         if {[variant_isset polly]} {
-            if {${worksrcdir} eq "trunk"} {
-                system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/polly/trunk polly"
-            } elseif {${worksrcdir} eq "release_${llvm_version_no_dot}" } {
-                system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/polly/branches/release_${llvm_version_no_dot} polly"
-            } else {
-                file rename ${workpath}/polly-${version}.src ${worksrcpath}/tools/polly
-            }
+            file rename ${workpath}/polly-${version}.src ${worksrcpath}/tools/polly
         }
     } elseif {${subport} eq "clang-${llvm_version}"} {
-        if {${worksrcdir} eq "trunk"} {
-            system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/cfe/trunk clang"
-            system -W ${worksrcpath}/projects "svn ${proxy_args} co -r ${compiler_rt_rev} https://llvm.org/svn/llvm-project/compiler-rt/trunk compiler-rt"
-            system -W ${worksrcpath}/projects "svn ${proxy_args} co -r ${libcxx_rev} https://llvm.org/svn/llvm-project/libcxx/trunk libcxx"
-            system -W ${worksrcpath}/tools/clang/tools "svn ${proxy_args} co -r ${clang-modernize_rev} https://llvm.org/svn/llvm-project/clang-tools-extra/trunk extra"
-        } elseif {${worksrcdir} eq "release_${llvm_version_no_dot}" } {
-            system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/cfe/branches/release_${llvm_version_no_dot} clang"
-            system -W ${worksrcpath}/projects "svn ${proxy_args} co -r ${compiler_rt_rev} https://llvm.org/svn/llvm-project/compiler-rt/branches/release_${llvm_version_no_dot} compiler-rt"
-            system -W ${worksrcpath}/projects "svn ${proxy_args} co -r ${libcxx_rev} https://llvm.org/svn/llvm-project/libcxx/branches/release_${llvm_version_no_dot} libcxx"
-            system -W ${worksrcpath}/tools/clang/tools "svn ${proxy_args} co -r ${clang-modernize_rev} https://llvm.org/svn/llvm-project/clang-tools-extra/branches/release_${llvm_version_no_dot} extra"
-        } else {
-            file rename ${workpath}/cfe-${version}.src ${worksrcpath}/tools/clang
-            file rename ${workpath}/compiler-rt-${version}.src ${worksrcpath}/projects/compiler-rt
-            file rename ${workpath}/libcxx-${version}.src ${worksrcpath}/projects/libcxx
-            file rename ${workpath}/clang-tools-extra-${version}.src ${worksrcpath}/tools/clang/tools/extra
-        }
+        file rename ${workpath}/cfe-${version}.src ${worksrcpath}/tools/clang
+        file rename ${workpath}/compiler-rt-${version}.src ${worksrcpath}/projects/compiler-rt
+        file rename ${workpath}/libcxx-${version}.src ${worksrcpath}/projects/libcxx
+        file rename ${workpath}/clang-tools-extra-${version}.src ${worksrcpath}/tools/clang/tools/extra
     } elseif {${subport} eq "lldb-${llvm_version}"} {
-        if {${worksrcdir} eq "trunk"} {
-            system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/cfe/trunk clang"
-            system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/lldb/trunk lldb"
-        } elseif {${worksrcdir} eq "release_${llvm_version_no_dot}" } {
-            system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/cfe/branches/release_${llvm_version_no_dot} clang"
-            system -W ${worksrcpath}/tools "svn ${proxy_args} co -r ${svn.revision} https://llvm.org/svn/llvm-project/lldb/branches/release_${llvm_version_no_dot} lldb"
-        } else {
-            file rename ${workpath}/cfe-${version}.src ${worksrcpath}/tools/clang
-            file rename ${workpath}/lldb-${version}.src ${worksrcpath}/tools/lldb
-        }
+        file rename ${workpath}/cfe-${version}.src ${worksrcpath}/tools/clang
+        file rename ${workpath}/lldb-${version}.src ${worksrcpath}/tools/lldb
     }
 }
 
