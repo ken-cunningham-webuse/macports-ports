@@ -51,7 +51,7 @@ if {${subport} eq "llvm-${llvm_version}"} {
                         that can be built using the Clang frontend as a \
                         library to parse C/C++ code.
 
-    depends_lib         port:libxml2 port:libomp port:llvm-${llvm_version}
+    depends_lib         port:libomp port:llvm-${llvm_version}
     depends_run         port:clang_select port:ld64
     depends_skip_archcheck-append ld64 subversion
 
@@ -84,7 +84,7 @@ if {${subport} eq "llvm-${llvm_version}"} {
     description         the LLVM debugger
     long_description    Lldb is the "LLVM native" debugger.
 
-    depends_lib         port:libxml2 port:libomp port:llvm-${llvm_version} port:ncurses
+    depends_lib         port:libomp port:llvm-${llvm_version} port:ncurses
     depends_build-append port:swig-python port:doxygen
 
     # Clang doesn't actually use any of these, but the LLVM makefile
@@ -257,7 +257,10 @@ configure.args-append \
     -DLLVM_INCLUDE_EXAMPLES=OFF \
     -DLLVM_ENABLE_FFI=ON \
     -DLLVM_BINDINGS_LIST=none \
-    -DFFI_INCLUDE_DIR=`pkg-config --cflags-only-I libffi | sed 's/-I//'` \
+    -DLIBXML2_INCLUDE_DIR=${configure.sdkroot}/usr/include/libxml2 \
+    -DLIBXML2_LIBRARY=${configure.sdkroot}/usr/lib/libxml2.dylib \
+    -DLIBXML2_XMLLINT_EXECUTABLE=${configure.sdkroot}/usr/bin/xmllint \
+    -DFFI_INCLUDE_DIR=${prefix}/include \
     -DFFI_LIBRARY_DIR=${prefix}/lib
 
 if {${os.major} < 11} {
